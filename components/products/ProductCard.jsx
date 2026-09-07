@@ -4,6 +4,14 @@ import { useState } from 'react';
 import { Pencil, Trash2, Package, Eye } from 'lucide-react';
 import StatusBadge from '@/components/feedback/StatusBadge';
 
+/**
+ * Enterprise ProductCard Component
+ * Displays retail product details with:
+ * - Dynamic stock status badge (In Stock, Low Stock <= 10, Out of Stock = 0)
+ * - Quick View trigger on image and title with full keyboard accessibility
+ * - Edit and Delete actions with isolated click handlers
+ * - Graceful fallback on broken image URLs
+ */
 export default function ProductCard({
   product,
   onEdit,
@@ -12,15 +20,23 @@ export default function ProductCard({
 }) {
   const [imgError, setImgError] = useState(false);
 
+  const handleKeyQuickView = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onQuickView && onQuickView(product);
+    }
+  };
+
   return (
     <div className="group bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col hover:-translate-y-0.5">
       {/* Clickable Image Container for Quick View */}
       <div
         onClick={() => onQuickView && onQuickView(product)}
-        className="relative h-44 bg-gray-50 flex items-center justify-center cursor-pointer overflow-hidden"
+        onKeyDown={handleKeyQuickView}
+        className="relative h-44 bg-gray-50 flex items-center justify-center cursor-pointer overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-500"
         role="button"
         tabIndex={0}
-        aria-label={`Quick view ${product.title}`}
+        aria-label={`Quick view details for ${product.title}`}
       >
         {!imgError && product.thumbnail ? (
           <img
@@ -42,7 +58,7 @@ export default function ProductCard({
         </div>
 
         {/* Category Pill */}
-        <span className="absolute top-2 left-2 bg-white/90 text-gray-600 text-xs px-2 py-0.5 rounded-full capitalize shadow-xs font-medium">
+        <span className="absolute top-2 left-2 bg-white/90 backdrop-blur-xs text-gray-600 text-xs px-2 py-0.5 rounded-full capitalize shadow-xs font-medium">
           {product.category}
         </span>
       </div>
@@ -52,7 +68,11 @@ export default function ProductCard({
         {/* Title (Clickable) */}
         <h3
           onClick={() => onQuickView && onQuickView(product)}
-          className="font-semibold text-gray-800 text-sm line-clamp-2 mb-1 hover:text-blue-600 cursor-pointer transition-colors"
+          onKeyDown={handleKeyQuickView}
+          tabIndex={0}
+          role="button"
+          aria-label={`View details for ${product.title}`}
+          className="font-semibold text-gray-800 text-sm line-clamp-2 mb-1 hover:text-blue-600 cursor-pointer transition-colors focus:outline-none focus:text-blue-600"
         >
           {product.title}
         </h3>
@@ -76,22 +96,24 @@ export default function ProductCard({
           {/* Action Buttons */}
           <div className="flex gap-1.5">
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit(product);
               }}
               className="p-2 rounded-lg hover:bg-blue-50 text-gray-500 hover:text-blue-600 transition-colors"
-              aria-label="Edit product"
+              aria-label={`Edit ${product.title}`}
             >
               <Pencil className="h-4 w-4" />
             </button>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(product);
               }}
               className="p-2 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors"
-              aria-label="Delete product"
+              aria-label={`Delete ${product.title}`}
             >
               <Trash2 className="h-4 w-4" />
             </button>

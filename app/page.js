@@ -5,14 +5,14 @@ import { useProductContext } from '@/context/ProductContext';
 import { useCategories } from '@/hooks/useCategories';
 import { useDebounce } from '@/hooks/useDebounce';
 import Navbar from '@/components/layout/Navbar';
-import CategoryFilter from '@/components/filters/CategoryFilter';
+import FilterBar from '@/components/filters/FilterBar';
 import SortDropdown from '@/components/filters/SortDropdown';
 import ActiveFiltersBar from '@/components/filters/ActiveFiltersBar';
 import QuickStats from '@/components/feedback/QuickStats';
 import ExportCSVButton from '@/components/ui/ExportCSVButton';
 import Pagination from '@/components/ui/Pagination';
 import ProductGrid from '@/components/products/ProductGrid';
-import ProductForm from '@/components/products/ProductForm';
+import ProductModal from '@/components/products/ProductModal';
 import DeleteConfirm from '@/components/products/DeleteConfirm';
 import ProductDetailsModal from '@/components/products/ProductDetailsModal';
 import Modal from '@/components/ui/Modal';
@@ -52,14 +52,14 @@ export default function Dashboard() {
   const [deletingProduct, setDeletingProduct] = useState(null);
   const [quickViewProduct, setQuickViewProduct] = useState(null);
 
-  const debouncedSearch = useDebounce(searchInput, 400);
+  const debouncedSearch = useDebounce(searchInput, 300);
 
   // Initial products fetch on mount
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
-  // React to debounced search input
+  // React to debounced search input with automatic pagination reset
   useEffect(() => {
     setCurrentPage(1);
     if (debouncedSearch.trim()) {
@@ -72,22 +72,28 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
-  // Search input change handler
+  // Search input change handler with instant pagination reset
   const handleSearchChange = (e) => {
     const val = e.target.value;
     setSearchInput(val);
+    setCurrentPage(1);
     if (val.trim() && activeCategory !== 'all') {
       setActiveCategory('all');
     }
   };
 
-  // Clear search input (X button)
+  // Clear search input (X button) with instant pagination reset
   const handleClearSearch = () => {
     setSearchInput('');
     setCurrentPage(1);
+    if (activeCategory === 'all') {
+      fetchProducts();
+    } else {
+      fetchByCategory(activeCategory);
+    }
   };
 
-  // Category switch handler
+  // Category switch handler with instant pagination reset
   const handleCategoryChange = (category) => {
     setActiveCategory(category);
     setSearchInput('');
@@ -103,11 +109,14 @@ export default function Dashboard() {
     handleCategoryChange('all');
   };
 
-  // Clickable KPI Card filter handler
+  // Clickable KPI Card filter handler with instant pagination reset
   const handleSelectStockFilter = (filterKey) => {
     setCurrentPage(1);
-    // If clicking the currently active filter, toggle back to 'all'
-    if (activeStockFilter === filterKey) {
+    // Clicking 'Total Products' resets stock filter to 'all'
+    if (filterKey === 'all') {
+      setActiveStockFilter('all');
+    } else if (activeStockFilter === filterKey) {
+      // Toggle back to 'all' if clicking already active filter
       setActiveStockFilter('all');
     } else {
       setActiveStockFilter(filterKey);
@@ -162,7 +171,7 @@ export default function Dashboard() {
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
     if (typeof window !== 'undefined') {
-      window.scrollTo({ top: 300, behavior: 'smooth' });
+      window.scrollTo({ top: 250, behavior: 'smooth' });
     }
   };
 
@@ -198,15 +207,25 @@ export default function Dashboard() {
     }
   }, [stockFilteredProducts, sortBy]);
 
+  // Total pages calculation and auto-clamping
+  const totalPages = Math.ceil(sortedProducts.length / pageSize) || 1;
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   // 3. Apply Client-Side Pagination (16 products per page)
   const paginatedProducts = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
+    const safePage = Math.min(Math.max(1, currentPage), totalPages);
+    const startIndex = (safePage - 1) * pageSize;
     return sortedProducts.slice(startIndex, startIndex + pageSize);
-  }, [sortedProducts, currentPage, pageSize]);
+  }, [sortedProducts, currentPage, totalPages, pageSize]);
 
   return (
     <div className="min-h-screen bg-gray-50/70">
-      {/* Header Navbar with responsive search, X clear button & Add CTA */}
+      {/* Header Navbar with search input, clear button, and Add Product button */}
       <Navbar
         searchInput={searchInput}
         onSearchChange={handleSearchChange}
@@ -215,7 +234,7 @@ export default function Dashboard() {
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Executive Kirana Inventory Overview with Clickable Quick-Filters */}
+        {/* Executive Kirana Inventory Overview with Clickable KPI Quick-Filters */}
         <QuickStats
           products={allProducts && allProducts.length > 0 ? allProducts : products}
           categories={categories}
@@ -223,14 +242,14 @@ export default function Dashboard() {
           onSelectStockFilter={handleSelectStockFilter}
         />
 
-        {/* Category Filter Tabs */}
-        <CategoryFilter
+        {/* Category Filter Tabs via FilterBar */}
+        <FilterBar
           categories={categories}
           activeCategory={activeCategory}
           onSelectCategory={handleCategoryChange}
         />
 
-        {/* Active Filters Bar (Shown only when any filter is applied) */}
+        {/* Active Filters Bar (Shown only when any filter is active) */}
         <ActiveFiltersBar
           searchInput={searchInput}
           activeCategory={activeCategory}
@@ -242,7 +261,7 @@ export default function Dashboard() {
           onResetAll={handleResetAllFilters}
         />
 
-        {/* Toolbar: Product Count Indicator, Export CSV & Sort Dropdown */}
+        {/* Toolbar: Count indicator, CSV Export, and Sort Dropdown */}
         {!loading && !error && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-3 border-b border-gray-200">
             <p className="text-xs sm:text-sm text-gray-500 font-medium">
@@ -312,31 +331,21 @@ export default function Dashboard() {
       </main>
 
       {/* Add Product Modal */}
-      <Modal
+      <ProductModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        title="Add New Product"
-      >
-        <ProductForm
-          categories={categories}
-          onSubmit={handleAddProduct}
-          onCancel={() => setIsAddModalOpen(false)}
-        />
-      </Modal>
+        categories={categories}
+        onSubmit={handleAddProduct}
+      />
 
       {/* Edit Product Modal */}
-      <Modal
+      <ProductModal
         isOpen={Boolean(editingProduct)}
         onClose={() => setEditingProduct(null)}
-        title="Edit Product"
-      >
-        <ProductForm
-          product={editingProduct}
-          categories={categories}
-          onSubmit={handleUpdateProduct}
-          onCancel={() => setEditingProduct(null)}
-        />
-      </Modal>
+        product={editingProduct}
+        categories={categories}
+        onSubmit={handleUpdateProduct}
+      />
 
       {/* Delete Confirmation Modal */}
       <Modal

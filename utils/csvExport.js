@@ -1,9 +1,13 @@
 /**
  * Utility to export an array of product objects to a downloadable CSV file.
- * Formats fields safely with quotes to handle commas and line breaks.
+ * Formats fields safely with quotes to handle commas, quotes, and line breaks.
+ * Filename format: dukaanse-products-YYYY-MM-DD.csv
  */
-export function exportProductsToCSV(products, filename = 'dukaanse-products.csv') {
+export function exportProductsToCSV(products, customFilename) {
   if (!products || products.length === 0) return false;
+
+  const today = new Date().toISOString().split('T')[0];
+  const filename = customFilename || `dukaanse-products-${today}.csv`;
 
   const headers = [
     'ID',

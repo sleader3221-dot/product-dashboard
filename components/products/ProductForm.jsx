@@ -50,8 +50,8 @@ export default function ProductForm({ product, categories, onSubmit, onCancel })
     const success = await onSubmit({
       title: form.title.trim(),
       category: form.category.trim(),
-      price: Number(form.price),
-      stock: Number(form.stock),
+      price: Number(Number(form.price).toFixed(2)),
+      stock: Math.floor(Number(form.stock)),
       thumbnail: form.thumbnail.trim(),
     });
     setSubmitting(false);

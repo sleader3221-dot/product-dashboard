@@ -15,13 +15,14 @@ export default function ExportCSVButton({
       return;
     }
 
-    let filename = 'dukaanse-products.csv';
+    const today = new Date().toISOString().split('T')[0];
+    let filename = `dukaanse-products-${today}.csv`;
     if (activeStockFilter === 'low') {
-      filename = 'dukaanse-low-stock-reorder.csv';
+      filename = `dukaanse-low-stock-${today}.csv`;
     } else if (activeStockFilter === 'out') {
-      filename = 'dukaanse-out-of-stock.csv';
+      filename = `dukaanse-out-of-stock-${today}.csv`;
     } else if (activeCategory !== 'all') {
-      filename = `dukaanse-${activeCategory}-products.csv`;
+      filename = `dukaanse-${activeCategory}-${today}.csv`;
     }
 
     const success = exportProductsToCSV(products, filename);
