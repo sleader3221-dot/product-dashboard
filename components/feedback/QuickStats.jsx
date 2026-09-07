@@ -6,6 +6,7 @@ export default function QuickStats({
   products = [],
   categories = [],
   kpiFilter = 'all',
+  activeCategory = 'all',
   activeStockFilter, // Backwards-compatible prop
   onSelectKpiFilter,
   onSelectStockFilter, // Backwards-compatible prop
@@ -14,13 +15,6 @@ export default function QuickStats({
   const currentFilter = kpiFilter || activeStockFilter || 'all';
 
   const handleSelect = (filterKey) => {
-    if (filterKey === 'categories') {
-      const el = document.getElementById('category-bar');
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }
-
     if (onSelectKpiFilter) {
       onSelectKpiFilter(filterKey);
     } else if (onSelectStockFilter) {
@@ -44,7 +38,8 @@ export default function QuickStats({
   ).length;
 
   const isAllActive = currentFilter === 'all';
-  const isCategoriesActive = currentFilter === 'categories';
+  const isCategoriesActive =
+    currentFilter === 'categories' || (activeCategory && activeCategory !== 'all');
   const isLowStockActive =
     currentFilter === 'low_stock' || currentFilter === 'low';
   const isOutOfStockActive =
@@ -77,14 +72,19 @@ export default function QuickStats({
         <p className="text-lg sm:text-xl font-bold text-gray-900">{totalProducts}</p>
       </button>
 
-      {/* 2. Categories KPI Button (Smooth Scrolls to Category Bar) */}
+      {/* 2. Categories KPI Filter Button (Interactive category switching) */}
       <button
         type="button"
         onClick={() => handleSelect('categories')}
         aria-pressed={isCategoriesActive}
+        title={
+          isCategoriesActive && activeCategory !== 'all'
+            ? `Current category: ${activeCategory} (click to switch next)`
+            : 'Filter by category'
+        }
         className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer relative overflow-hidden active:scale-98 ${
           isCategoriesActive
-            ? 'bg-indigo-50/60 border-indigo-500 ring-2 ring-indigo-500 shadow-sm'
+            ? 'bg-indigo-50/70 border-indigo-500 ring-2 ring-indigo-500 shadow-sm'
             : 'bg-white border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/20'
         }`}
       >
@@ -93,16 +93,24 @@ export default function QuickStats({
             <Layers className="h-4 w-4" />
           </div>
           {isCategoriesActive ? (
-            <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider bg-indigo-100/90 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+            <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider bg-indigo-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
               <Check className="h-3 w-3" /> ACTIVE
             </span>
           ) : (
             <span className="text-[10px] text-indigo-600 font-semibold bg-indigo-50 px-1.5 py-0.5 rounded">
-              Browse
+              Filter
             </span>
           )}
         </div>
-        <p className="text-xs font-medium text-gray-500">Categories</p>
+        <p className="text-xs font-medium text-gray-500 truncate">
+          {isCategoriesActive && activeCategory !== 'all' ? (
+            <span>
+              Cat: <span className="text-indigo-600 font-semibold capitalize">{activeCategory}</span>
+            </span>
+          ) : (
+            'Categories'
+          )}
+        </p>
         <p className="text-lg sm:text-xl font-bold text-gray-900">{categoriesCount}</p>
       </button>
 

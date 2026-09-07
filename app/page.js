@@ -19,7 +19,7 @@ import Modal from '@/components/ui/Modal';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import ErrorState from '@/components/ui/ErrorState';
 import EmptyState from '@/components/ui/EmptyState';
-import { Sparkles, PackageCheck } from 'lucide-react';
+import { PackageCheck } from 'lucide-react';
 
 export default function Dashboard() {
   const {
@@ -101,8 +101,10 @@ export default function Dashboard() {
     setSearchInput('');
     setCurrentPage(1);
     if (category === 'all') {
+      setKpiFilter('all');
       fetchProducts();
     } else {
+      setKpiFilter('categories');
       fetchByCategory(category);
     }
   };
@@ -112,27 +114,50 @@ export default function Dashboard() {
   };
 
   // Interactive 4 KPI Cards Filter handler:
-  // - Clicking 'Total Products' sets kpiFilter to 'all'
+  // - Clicking 'Total Products' sets kpiFilter to 'all' and resets to full catalog
+  // - Clicking 'Categories' switches active category (first or next in list) and scrolls to category bar
   // - Clicking 'Low Stock (<10)' sets kpiFilter to 'low_stock'
   // - Clicking 'Out of Stock' sets kpiFilter to 'out_of_stock'
-  // - Clicking 'Categories' scrolls smoothly to #category-bar
   // - Clicking any card ALWAYS resets currentPage to 1
   const handleSelectKpiFilter = (filterKey) => {
     setCurrentPage(1);
 
     if (filterKey === 'categories') {
+      setKpiFilter('categories');
+
+      // Seamlessly switch to the first category if 'all', or cycle to the next category!
+      if (categories && categories.length > 0) {
+        const catSlugs = categories.map((c) => c.slug || c);
+        const currentIndex = catSlugs.indexOf(activeCategory);
+        const nextIndex =
+          currentIndex === -1 ? 0 : (currentIndex + 1) % catSlugs.length;
+        const nextCategory = catSlugs[nextIndex];
+        setActiveCategory(nextCategory);
+        setSearchInput('');
+        fetchByCategory(nextCategory);
+      }
+
+      // Smooth scroll to category bar
       const bar = document.getElementById('category-bar');
       if (bar) {
-        bar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
       return;
     }
 
     if (filterKey === 'all') {
       setKpiFilter('all');
-    } else if (kpiFilter === filterKey) {
+      setActiveCategory('all');
+      setSearchInput('');
+      fetchProducts();
+      return;
+    }
+
+    if (kpiFilter === filterKey) {
       // Toggle back to 'all' if clicking already selected filter
       setKpiFilter('all');
+      setActiveCategory('all');
+      fetchProducts();
     } else {
       setKpiFilter(filterKey);
     }
@@ -140,7 +165,9 @@ export default function Dashboard() {
 
   const handleClearKpiFilter = () => {
     setKpiFilter('all');
+    setActiveCategory('all');
     setCurrentPage(1);
+    fetchProducts();
   };
 
   // Global reset for all filters
@@ -190,7 +217,7 @@ export default function Dashboard() {
     }
   };
 
-  // 1. Filter by KPI Stock Filter ('all' | 'low_stock' | 'out_of_stock')
+  // 1. Filter by KPI Stock Filter ('all' | 'categories' | 'low_stock' | 'out_of_stock')
   const filteredProducts = useMemo(() => {
     if (kpiFilter === 'low_stock') {
       return products.filter(
@@ -254,6 +281,7 @@ export default function Dashboard() {
           products={allProducts && allProducts.length > 0 ? allProducts : products}
           categories={categories}
           kpiFilter={kpiFilter}
+          activeCategory={activeCategory}
           onSelectKpiFilter={handleSelectKpiFilter}
         />
 
