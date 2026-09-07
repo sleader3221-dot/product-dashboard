@@ -11,7 +11,7 @@ A fully responsive product management dashboard built with Next.js and Tailwind 
 **Prerequisites:** Node.js 18+
 
 ```bash
-git clone https://github.com/yourusername/product-dashboard.git
+git clone https://github.com/sleader3221-dot/product-dashboard.git
 cd product-dashboard
 npm install
 npm run dev
