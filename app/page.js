@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useProductContext } from '@/context/ProductContext';
 import { useCategories } from '@/hooks/useCategories';
 import { useDebounce } from '@/hooks/useDebounce';
 import Navbar from '@/components/layout/Navbar';
 import CategoryFilter from '@/components/filters/CategoryFilter';
+import SortDropdown from '@/components/filters/SortDropdown';
+import QuickStats from '@/components/feedback/QuickStats';
 import ProductGrid from '@/components/products/ProductGrid';
 import ProductForm from '@/components/products/ProductForm';
 import DeleteConfirm from '@/components/products/DeleteConfirm';
@@ -31,6 +33,7 @@ export default function Dashboard() {
 
   const [searchInput, setSearchInput] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  const [sortBy, setSortBy] = useState('default');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [deletingProduct, setDeletingProduct] = useState(null);
@@ -99,8 +102,27 @@ export default function Dashboard() {
     if (success) setDeletingProduct(null);
   };
 
+  // Operational sorting for retail store managers (Price, Stock replenishment, Alphabetical)
+  const sortedProducts = useMemo(() => {
+    const list = [...products];
+    switch (sortBy) {
+      case 'price-asc':
+        return list.sort((a, b) => Number(a.price) - Number(b.price));
+      case 'price-desc':
+        return list.sort((a, b) => Number(b.price) - Number(a.price));
+      case 'stock-asc':
+        return list.sort((a, b) => Number(a.stock) - Number(b.stock));
+      case 'stock-desc':
+        return list.sort((a, b) => Number(b.stock) - Number(a.stock));
+      case 'name-asc':
+        return list.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+      default:
+        return list;
+    }
+  }, [products, sortBy]);
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50/70">
       {/* Navbar with responsive search & Add button */}
       <Navbar
         searchInput={searchInput}
@@ -109,6 +131,9 @@ export default function Dashboard() {
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {/* Executive Kirana Inventory Overview Pills */}
+        <QuickStats products={products} categories={categories} />
+
         {/* Category Filter tabs */}
         <CategoryFilter
           categories={categories}
@@ -116,16 +141,19 @@ export default function Dashboard() {
           onSelectCategory={handleCategoryChange}
         />
 
-        {/* Product count indicator */}
+        {/* Toolbar: Product count & Sort dropdown */}
         {!loading && !error && (
-          <p className="text-sm text-gray-400 mb-4">
-            {products.length} product{products.length !== 1 ? 's' : ''} found
-            {searchInput
-              ? ` for "${searchInput}"`
-              : activeCategory !== 'all'
-              ? ` in "${activeCategory}"`
-              : ''}
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-3 border-b border-gray-200">
+            <p className="text-sm text-gray-500 font-medium">
+              Showing <span className="font-semibold text-gray-900">{sortedProducts.length}</span> product{sortedProducts.length !== 1 ? 's' : ''}
+              {searchInput && ` for "${searchInput}"`}
+              {activeCategory !== 'all' && !searchInput && (
+                <span> in <span className="capitalize font-semibold text-blue-600">{activeCategory}</span></span>
+              )}
+            </p>
+
+            <SortDropdown value={sortBy} onChange={setSortBy} />
+          </div>
         )}
 
         {/* Dynamic UI Content States */}
@@ -135,13 +163,13 @@ export default function Dashboard() {
           <ErrorState message={error} onRetry={handleRetry} />
         )}
 
-        {!loading && !error && products.length === 0 && (
+        {!loading && !error && sortedProducts.length === 0 && (
           <EmptyState query={searchInput} />
         )}
 
-        {!loading && !error && products.length > 0 && (
+        {!loading && !error && sortedProducts.length > 0 && (
           <ProductGrid
-            products={products}
+            products={sortedProducts}
             onEdit={setEditingProduct}
             onDelete={setDeletingProduct}
           />

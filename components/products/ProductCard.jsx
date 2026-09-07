@@ -35,11 +35,13 @@ export default function ProductCard({ product, onEdit, onDelete }) {
             <p className="text-lg font-bold text-gray-900">
               ${(Number(product.price) || 0).toFixed(2)}
             </p>
-            <div className="flex items-center gap-1 mt-0.5">
+            <div className="flex flex-wrap items-center gap-1.5 mt-1">
               <StatusBadge stock={Number(product.stock) || 0} />
-              <span className="text-xs text-gray-400">
-                {product.stock ?? 0} units
-              </span>
+              {Number(product.stock) > 10 && (
+                <span className="text-xs text-gray-400">
+                  {product.stock} units
+                </span>
+              )}
             </div>
           </div>
 
