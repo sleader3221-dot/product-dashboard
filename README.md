@@ -58,30 +58,33 @@ Open [http://localhost:3000](http://localhost:3000)
 - ✅ Toast notifications for all operations
 - ✅ Fully responsive (mobile + desktop)
 - ✅ Meaningful Git commit history
+- ✅ **Clickable KPI Quick-Filters**: Click on "Total Products", "Low Stock (≤10)", or "Out of Stock" cards to instantly filter the entire catalog.
+- ✅ **Search Clear ("X") & Active Filter Pills Bar**: One-click clear for search queries and multi-pill indicator showing active category, search, and stock filters with individual removal and one-click "Reset all".
+- ✅ **Product Details / Quick View Modal**: Click on any product image or title to open a rich modal with image gallery switcher, rating stars, discount badge, description, and quick edit/delete buttons.
+- ✅ **Export Reorder Sheet (CSV)**: One-click formatted CSV export with smart naming (`dukaanse-low-stock-reorder.csv`, `dukaanse-products.csv`) using pure browser Blobs (UTF-8 BOM support for Excel & Sheets).
+- ✅ **Client-Side Pagination**: Clean 16 items/page with range indicator (`Showing 1–16 of 194`), windowed page buttons, and smooth scroll to top.
 
 ## 🌟 Top 1% Touches (DukaanSe Kirana & Retail Mindset)
 
-1. **Dynamic Stock Alert Badges (Inventory Health):**
+1. **Interactive KPI Quick-Filters & Live Inventory Counts:**
+   - The 4 top KPI cards (Total Products, Active Categories, Low Stock ≤10, Out of Stock) are dynamic filter triggers.
+   - Clicking "Low Stock" instantly filters the grid to all items needing replenishment and highlights the active metric card.
+   - Real-time catalog synchronization: Adding or deleting products immediately increments or decrements the counters in real time.
+
+2. **Dynamic Stock Alert Badges (Inventory Health):**
    - Stock > 10: Emerald Green (`bg-emerald-50 text-emerald-700`) ➔ `"In stock"`
    - Stock 1–10: Amber Warning (`bg-amber-50 text-amber-700`) ➔ `"Low stock (X left)"`
    - Stock = 0: Rose Alert with Pulse Animation (`bg-rose-50 text-rose-700`) ➔ `"Out of stock"`
    - *Value for DukaanSe:* Enables local store managers to immediately identify items needing replenishment before stockouts occur.
 
-2. **Operational Sort Dropdown (Price & Replenishment Priority):**
-   - Sort by **Default / Featured**
-   - Sort by **Price: Low to High** and **Price: High to Low**
-   - Sort by **Stock: Low to High (Restock Priority)** — allows shopkeepers to instantly generate re-order purchasing lists.
-   - Sort by **Stock: High to Low** and **Name: A to Z**
+3. **Operational Sort & CSV Reorder Sheet:**
+   - Sort by **Default / Featured**, **Price: Low to High**, **Price: High to Low**, **Stock: Low to High (Restock Priority)**, and **Name: A to Z**.
+   - Store owners can filter by "Low Stock", sort by "Stock: Low to High", and click **"Export CSV"** to generate a replenishment order sheet ready for suppliers or WhatsApp distributors.
 
-3. **Store Overview Metrics Pills (Header Counters):**
-   - Real-time KPI summary bar showing:
-     - 📦 **Total Products**
-     - 🏷️ **Active Departments / Categories**
-     - ⚠️ **Low Stock Count (≤10)**
-     - 🚨 **Out of Stock Count**
-   - Provides store owners with an executive snapshot of inventory health with zero performance overhead.
+4. **Product Details & Thumbnail Gallery:**
+   - Shop owners can inspect all product images, verify pricing, stock, rating, and description without navigating away from the dashboard.
 
 ## Known Limitations
 
-- **DummyJSON is a mock API:** POST/PUT/DELETE responses are simulated and do not actually persist data server-side. The app handles this with **optimistic UI updates** — state is updated locally after a successful API response.
-- **Product images** come from DummyJSON's CDN; broken image URLs show a fallback icon.
+- **DummyJSON is a mock API:** POST/PUT/DELETE responses are simulated and do not actually persist data on DummyJSON's public servers. The app handles this with **full client-side store persistence and optimistic UI updates** — additions, edits, and deletions update the in-memory singleton pool and UI in real time.
+- **Product images** come from DummyJSON's CDN; broken image URLs gracefully display a fallback icon.

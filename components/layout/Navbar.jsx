@@ -1,8 +1,13 @@
 'use client';
 
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 
-export default function Navbar({ searchInput, onSearchChange, onAddClick }) {
+export default function Navbar({
+  searchInput,
+  onSearchChange,
+  onClearSearch,
+  onAddClick,
+}) {
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-40 backdrop-blur-md bg-white/95">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
@@ -26,16 +31,25 @@ export default function Navbar({ searchInput, onSearchChange, onAddClick }) {
           </div>
         </div>
 
-        {/* Global Search Bar */}
+        {/* Global Search Bar with Quick Clear (X) Button */}
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
           <input
             type="text"
             placeholder="Search products by name..."
             value={searchInput}
             onChange={onSearchChange}
-            className="w-full pl-9 pr-4 py-2 bg-gray-50 hover:bg-white focus:bg-white border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
+            className="w-full pl-9 pr-9 py-2 bg-gray-50 hover:bg-white focus:bg-white border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
           />
+          {searchInput && (
+            <button
+              onClick={onClearSearch}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-200 transition-all"
+              aria-label="Clear search input"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Add Product CTA */}

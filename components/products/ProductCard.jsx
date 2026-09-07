@@ -1,35 +1,63 @@
 'use client';
 
 import { useState } from 'react';
-import { Pencil, Trash2, Package } from 'lucide-react';
+import { Pencil, Trash2, Package, Eye } from 'lucide-react';
 import StatusBadge from '@/components/feedback/StatusBadge';
 
-export default function ProductCard({ product, onEdit, onDelete }) {
+export default function ProductCard({
+  product,
+  onEdit,
+  onDelete,
+  onQuickView,
+}) {
   const [imgError, setImgError] = useState(false);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
-      <div className="relative h-44 bg-gray-50 flex items-center justify-center">
+    <div className="group bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col hover:-translate-y-0.5">
+      {/* Clickable Image Container for Quick View */}
+      <div
+        onClick={() => onQuickView && onQuickView(product)}
+        className="relative h-44 bg-gray-50 flex items-center justify-center cursor-pointer overflow-hidden"
+        role="button"
+        tabIndex={0}
+        aria-label={`Quick view ${product.title}`}
+      >
         {!imgError && product.thumbnail ? (
           <img
             src={product.thumbnail}
             alt={product.title}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
             onError={() => setImgError(true)}
           />
         ) : (
           <Package className="h-12 w-12 text-gray-300" />
         )}
-        <span className="absolute top-2 left-2 bg-white/90 text-gray-600 text-xs px-2 py-0.5 rounded-full capitalize">
+
+        {/* Hover Quick View Overlay */}
+        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <span className="bg-white/95 text-gray-800 text-xs font-semibold px-2.5 py-1 rounded-full shadow-md flex items-center gap-1">
+            <Eye className="h-3.5 w-3.5 text-blue-600" />
+            Quick View
+          </span>
+        </div>
+
+        {/* Category Pill */}
+        <span className="absolute top-2 left-2 bg-white/90 text-gray-600 text-xs px-2 py-0.5 rounded-full capitalize shadow-xs font-medium">
           {product.category}
         </span>
       </div>
 
+      {/* Body Content */}
       <div className="p-4 flex flex-col flex-1">
-        <h3 className="font-semibold text-gray-800 text-sm line-clamp-2 mb-1">
+        {/* Title (Clickable) */}
+        <h3
+          onClick={() => onQuickView && onQuickView(product)}
+          className="font-semibold text-gray-800 text-sm line-clamp-2 mb-1 hover:text-blue-600 cursor-pointer transition-colors"
+        >
           {product.title}
         </h3>
 
+        {/* Price and Stock Status */}
         <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-100">
           <div>
             <p className="text-lg font-bold text-gray-900">
@@ -45,16 +73,23 @@ export default function ProductCard({ product, onEdit, onDelete }) {
             </div>
           </div>
 
-          <div className="flex gap-2">
+          {/* Action Buttons */}
+          <div className="flex gap-1.5">
             <button
-              onClick={() => onEdit(product)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(product);
+              }}
               className="p-2 rounded-lg hover:bg-blue-50 text-gray-500 hover:text-blue-600 transition-colors"
               aria-label="Edit product"
             >
               <Pencil className="h-4 w-4" />
             </button>
             <button
-              onClick={() => onDelete(product)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(product);
+              }}
               className="p-2 rounded-lg hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors"
               aria-label="Delete product"
             >
