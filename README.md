@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Product Management Dashboard
 
-## Getting Started
+A fully responsive product management dashboard built with Next.js and Tailwind CSS.
 
-First, run the development server:
+## Live Demo
+
+[https://your-app.vercel.app](https://your-app.vercel.app)
+
+## Setup Instructions
+
+**Prerequisites:** Node.js 18+
 
 ```bash
+git clone https://github.com/yourusername/product-dashboard.git
+cd product-dashboard
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## Technology Used
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Tool | Purpose |
+|------|---------|
+| Next.js 14 (App Router) | React framework |
+| Tailwind CSS | Styling |
+| React Context + useReducer | State management |
+| react-hot-toast | User feedback notifications |
+| Lucide React | Icons |
+| DummyJSON API | Product data (mock REST API) |
 
-## Learn More
+## API Used
 
-To learn more about Next.js, take a look at the following resources:
+**Base URL:** `https://dummyjson.com`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Operation | Method | Endpoint |
+|-----------|--------|----------|
+| Get products | GET | `/products?limit=100` |
+| Search | GET | `/products/search?q={query}` |
+| Get categories | GET | `/products/categories` |
+| Filter by category | GET | `/products/category/{slug}` |
+| Add product | POST | `/products/add` |
+| Update product | PUT | `/products/{id}` |
+| Delete product | DELETE | `/products/{id}` |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Features Implemented
 
-## Deploy on Vercel
+- ✅ Product listing with image, name, category, price, and stock
+- ✅ Real-time debounced search by product name
+- ✅ Category filter tabs (API-driven)
+- ✅ Add product with full form validation
+- ✅ Edit product (pre-populated form)
+- ✅ Delete product with confirmation dialog
+- ✅ Loading skeleton animation
+- ✅ Error state with retry button
+- ✅ Empty state for no results
+- ✅ Toast notifications for all operations
+- ✅ Fully responsive (mobile + desktop)
+- ✅ Meaningful Git commit history
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Known Limitations
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **DummyJSON is a mock API:** POST/PUT/DELETE responses are simulated and do not actually persist data server-side. The app handles this with **optimistic UI updates** — state is updated locally after a successful API response.
+- **Product images** come from DummyJSON's CDN; broken image URLs show a fallback icon.
