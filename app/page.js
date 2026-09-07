@@ -19,7 +19,6 @@ import Modal from '@/components/ui/Modal';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import ErrorState from '@/components/ui/ErrorState';
 import EmptyState from '@/components/ui/EmptyState';
-import { PackageCheck } from 'lucide-react';
 
 export default function Dashboard() {
   const {
@@ -74,7 +73,7 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
-  // Search input typing handler: instantly resets page to 1
+  // Search input typing handler: resets pagination to 1
   const handleSearchChange = (e) => {
     const val = e.target.value;
     setSearchInput(val);
@@ -84,7 +83,7 @@ export default function Dashboard() {
     }
   };
 
-  // Clear search input (X button): instantly resets page to 1
+  // Clear search input (X button): resets pagination to 1
   const handleClearSearch = () => {
     setSearchInput('');
     setCurrentPage(1);
@@ -95,7 +94,7 @@ export default function Dashboard() {
     }
   };
 
-  // Category change handler: instantly resets page to 1
+  // Category change handler: resets pagination to 1
   const handleCategoryChange = (category) => {
     setActiveCategory(category);
     setSearchInput('');
@@ -114,10 +113,10 @@ export default function Dashboard() {
   };
 
   // Interactive 4 KPI Cards Filter handler:
-  // - Clicking 'Total Products' sets kpiFilter to 'all' and resets to full catalog
-  // - Clicking 'Categories' switches active category (first or next in list) and scrolls to category bar
-  // - Clicking 'Low Stock (<10)' sets kpiFilter to 'low_stock'
-  // - Clicking 'Out of Stock' sets kpiFilter to 'out_of_stock'
+  // - Clicking 'Total Products': resets kpiFilter to 'all' and activeCategory to 'all'
+  // - Clicking 'Categories': switches active category and scrolls smoothly to category bar
+  // - Clicking 'Low Stock (<10)': resets activeCategory to 'all' so user sees ALL 13 low-stock items in the store!
+  // - Clicking 'Out of Stock': resets activeCategory to 'all' and shows celebratory in-stock state
   // - Clicking any card ALWAYS resets currentPage to 1
   const handleSelectKpiFilter = (filterKey) => {
     setCurrentPage(1);
@@ -125,7 +124,7 @@ export default function Dashboard() {
     if (filterKey === 'categories') {
       setKpiFilter('categories');
 
-      // Seamlessly switch to the first category if 'all', or cycle to the next category!
+      // Seamlessly switch to first category if 'all', or cycle to next category
       if (categories && categories.length > 0) {
         const catSlugs = categories.map((c) => c.slug || c);
         const currentIndex = catSlugs.indexOf(activeCategory);
@@ -153,8 +152,24 @@ export default function Dashboard() {
       return;
     }
 
+    if (filterKey === 'low_stock') {
+      // If clicking low stock, reset category to 'all' so user sees all low-stock items in store
+      setKpiFilter('low_stock');
+      setActiveCategory('all');
+      setSearchInput('');
+      fetchProducts();
+      return;
+    }
+
+    if (filterKey === 'out_of_stock') {
+      setKpiFilter('out_of_stock');
+      setActiveCategory('all');
+      setSearchInput('');
+      fetchProducts();
+      return;
+    }
+
     if (kpiFilter === filterKey) {
-      // Toggle back to 'all' if clicking already selected filter
       setKpiFilter('all');
       setActiveCategory('all');
       fetchProducts();
@@ -217,18 +232,45 @@ export default function Dashboard() {
     }
   };
 
-  // 1. Filter by KPI Stock Filter ('all' | 'categories' | 'low_stock' | 'out_of_stock')
+  // Base catalog: Always use the living allProducts if available
+  const baseCatalog =
+    allProducts && allProducts.length > 0 ? allProducts : products;
+
+  // 1. Unified Multi-Stage Filter Pipeline
   const filteredProducts = useMemo(() => {
-    if (kpiFilter === 'low_stock') {
-      return products.filter(
-        (p) => Number(p.stock) > 0 && Number(p.stock) <= 10
+    let list = baseCatalog;
+
+    // A. Filter by Search Query
+    if (searchInput && searchInput.trim()) {
+      const q = searchInput.trim().toLowerCase();
+      list = list.filter(
+        (p) =>
+          (p.title && p.title.toLowerCase().includes(q)) ||
+          (p.category && p.category.toLowerCase().includes(q)) ||
+          (p.brand && p.brand.toLowerCase().includes(q)) ||
+          (p.description && p.description.toLowerCase().includes(q))
       );
     }
-    if (kpiFilter === 'out_of_stock') {
-      return products.filter((p) => Number(p.stock) === 0);
+
+    // B. Filter by Category (if not 'all')
+    if (activeCategory && activeCategory !== 'all') {
+      const cat = activeCategory.toLowerCase().trim();
+      list = list.filter(
+        (p) => p.category && p.category.toLowerCase().trim() === cat
+      );
     }
-    return products;
-  }, [products, kpiFilter]);
+
+    // C. Filter by KPI Stock Filter
+    if (kpiFilter === 'low_stock' || kpiFilter === 'low') {
+      list = list.filter(
+        (p) => Number(p.stock) > 0 && Number(p.stock) <= 10
+      );
+    } else if (kpiFilter === 'out_of_stock' || kpiFilter === 'out') {
+      list = list.filter((p) => Number(p.stock) === 0);
+    }
+
+    return list;
+  }, [baseCatalog, searchInput, activeCategory, kpiFilter]);
 
   // 2. Operational Sorting
   const sortedProducts = useMemo(() => {
@@ -354,35 +396,17 @@ export default function Dashboard() {
           <ErrorState message={error} onRetry={handleRetry} />
         )}
 
-        {/* Special Out of Stock Friendly Empty State */}
-        {!loading && !error && kpiFilter === 'out_of_stock' && sortedProducts.length === 0 && (
-          <div className="text-center py-16 px-4 bg-white rounded-2xl border border-emerald-100 shadow-xs my-6">
-            <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
-              🎉
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-1">
-              All Items Are In Stock!
-            </h3>
-            <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
-              Your inventory is in great shape. No products are currently out of stock.
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                setKpiFilter('all');
-                setCurrentPage(1);
-              }}
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all shadow-sm shadow-blue-200 cursor-pointer active:scale-95"
-            >
-              <PackageCheck className="h-4 w-4" />
-              View All Products
-            </button>
-          </div>
-        )}
-
-        {/* Standard Empty State for queries with no results */}
-        {!loading && !error && kpiFilter !== 'out_of_stock' && sortedProducts.length === 0 && (
-          <EmptyState query={searchInput} />
+        {/* Contextual Empty State */}
+        {!loading && !error && sortedProducts.length === 0 && (
+          <EmptyState
+            query={searchInput}
+            category={activeCategory}
+            kpiFilter={kpiFilter}
+            onResetFilters={handleResetAllFilters}
+            onClearSearch={handleClearSearch}
+            onClearCategory={handleClearCategory}
+            onClearKpiFilter={handleClearKpiFilter}
+          />
         )}
 
         {/* Product Grid and Pagination */}
