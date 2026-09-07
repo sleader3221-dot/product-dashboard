@@ -64,9 +64,9 @@ export function ProductProvider({ children }) {
     dispatch({ type: ACTIONS.SET_LOADING, payload: true });
     try {
       const data = await productApi.getAll();
-      dispatch({ type: ACTIONS.SET_PRODUCTS, payload: data.products });
+      dispatch({ type: ACTIONS.SET_PRODUCTS, payload: data.products || [] });
     } catch (err) {
-      dispatch({ type: ACTIONS.SET_ERROR, payload: err.message });
+      dispatch({ type: ACTIONS.SET_ERROR, payload: err.message || 'Failed to load products' });
       toast.error('Failed to load products');
     }
   }, []);
@@ -75,9 +75,9 @@ export function ProductProvider({ children }) {
     dispatch({ type: ACTIONS.SET_LOADING, payload: true });
     try {
       const data = await productApi.getByCategory(category);
-      dispatch({ type: ACTIONS.SET_PRODUCTS, payload: data.products });
+      dispatch({ type: ACTIONS.SET_PRODUCTS, payload: data.products || [] });
     } catch (err) {
-      dispatch({ type: ACTIONS.SET_ERROR, payload: err.message });
+      dispatch({ type: ACTIONS.SET_ERROR, payload: err.message || 'Failed to filter products' });
     }
   }, []);
 
@@ -85,9 +85,9 @@ export function ProductProvider({ children }) {
     dispatch({ type: ACTIONS.SET_LOADING, payload: true });
     try {
       const data = await productApi.search(query);
-      dispatch({ type: ACTIONS.SET_PRODUCTS, payload: data.products });
+      dispatch({ type: ACTIONS.SET_PRODUCTS, payload: data.products || [] });
     } catch (err) {
-      dispatch({ type: ACTIONS.SET_ERROR, payload: err.message });
+      dispatch({ type: ACTIONS.SET_ERROR, payload: err.message || 'Failed to search products' });
     }
   }, []);
 

@@ -6,11 +6,24 @@ export function useCategories() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
     productApi
       .getCategories()
-      .then((data) => setCategories(data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .then((data) => {
+        if (isMounted && Array.isArray(data)) {
+          setCategories(data);
+        }
+      })
+      .catch(() => {
+        // Fallback already handled gracefully by productApi.getCategories
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return { categories, loading };

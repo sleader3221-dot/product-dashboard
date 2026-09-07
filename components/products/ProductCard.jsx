@@ -36,7 +36,7 @@ export default function ProductCard({ product, onEdit, onDelete }) {
               ${(Number(product.price) || 0).toFixed(2)}
             </p>
             <div className="flex items-center gap-1 mt-0.5">
-              <StockBadge stock={Number(product.stock) || 0} />
+              <StatusBadge stock={Number(product.stock) || 0} />
               <span className="text-xs text-gray-400">
                 {product.stock ?? 0} units
               </span>
