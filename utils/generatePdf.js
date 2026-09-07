@@ -5,17 +5,23 @@ import autoTable from 'jspdf-autotable';
  * Format a number as currency $XX,XXX.XX
  */
 function formatCurrency(amount) {
-  return '$' + Number(amount || 0).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  return (
+    '$' +
+    Number(amount || 0).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  );
 }
 
 /**
  * Format date as DD Mon YYYY, HH:MM
  */
 function formatTimestamp(date = new Date()) {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
   const day = String(date.getDate()).padStart(2, '0');
   const month = months[date.getMonth()];
   const year = date.getFullYear();
@@ -71,10 +77,10 @@ export function exportToPdf({ products = [], activeFilter = 'All Products' } = {
   // Brand Header
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
+  doc.setFontSize(13.5);
   doc.text('DukaanSe | Kirana Inventory Audit & Reorder Report', marginX, 13);
 
-  // Subtitle / Metadata
+  // Subtitle / Scope Metadata
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(203, 213, 225); // #cbd5e1
@@ -98,9 +104,21 @@ export function exportToPdf({ products = [], activeFilter = 'All Products' } = {
 
   const kpis = [
     { label: 'TOTAL SKUs', value: String(totalSkus), color: [15, 23, 42] },
-    { label: 'TOTAL VALUATION', value: formatCurrency(totalValuation), color: [15, 23, 42] },
-    { label: 'LOW STOCK ALERTS', value: `${lowStockCount} items`, color: [217, 119, 6] }, // Amber #d97706
-    { label: 'OUT OF STOCK', value: `${outOfStockCount} items`, color: [225, 29, 72] }, // Red #e11d48
+    {
+      label: 'TOTAL VALUATION',
+      value: formatCurrency(totalValuation),
+      color: [15, 23, 42],
+    },
+    {
+      label: 'LOW STOCK ALERTS',
+      value: `${lowStockCount} items`,
+      color: [217, 119, 6], // Amber #d97706
+    },
+    {
+      label: 'OUT OF STOCK',
+      value: `${outOfStockCount} items`,
+      color: [225, 29, 72], // Red #e11d48
+    },
   ];
 
   kpis.forEach((kpi, idx) => {
@@ -118,7 +136,7 @@ export function exportToPdf({ products = [], activeFilter = 'All Products' } = {
     doc.setTextColor(kpi.color[0], kpi.color[1], kpi.color[2]);
     doc.text(kpi.value, colX, cardY + 13.5, { align: 'center' });
 
-    // Vertical Divider (except for last column)
+    // Vertical Divider
     if (idx < 3) {
       doc.setDrawColor(226, 232, 240);
       const dividerX = marginX + (idx + 1) * colWidth;
@@ -202,39 +220,50 @@ export function exportToPdf({ products = [], activeFilter = 'All Products' } = {
         }
       }
     },
-    didDrawPage: (data) => {
-      // Footer on every page
-      const pageNumber = doc.internal.getCurrentPageInfo().pageNumber;
-      const totalPages = doc.internal.getNumberOfPages();
-
-      // Top separator line for footer
-      doc.setDrawColor(226, 232, 240);
-      doc.line(marginX, pageHeight - 12, pageWidth - marginX, pageHeight - 12);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(148, 163, 184); // Slate-400
-
-      // Left footer
-      doc.text(
-        'DukaanSe Merchant Operations   •   Confidential & Proprietary',
-        marginX,
-        pageHeight - 7
-      );
-
-      // Right footer
-      doc.text(
-        `Page ${pageNumber} of ${totalPages}`,
-        pageWidth - marginX,
-        pageHeight - 7,
-        { align: 'right' }
-      );
-    },
   });
 
-  // 7. Auto-download PDF File
+  // 7. Multi-page Footer with Exact "Page X of Y" Calculation
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page++) {
+    doc.setPage(page);
+
+    // Top separator line for footer
+    doc.setDrawColor(226, 232, 240);
+    doc.line(marginX, pageHeight - 12, pageWidth - marginX, pageHeight - 12);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(148, 163, 184); // Slate-400
+
+    // Left footer
+    doc.text(
+      'DukaanSe Merchant Operations   •   Confidential & Proprietary',
+      marginX,
+      pageHeight - 7
+    );
+
+    // Right footer (Page X of Y)
+    doc.text(
+      `Page ${page} of ${totalPages}`,
+      pageWidth - marginX,
+      pageHeight - 7,
+      { align: 'right' }
+    );
+  }
+
+  // 8. Auto-download PDF File with Scope-Aware Dynamic Name
   const today = new Date().toISOString().slice(0, 10);
-  const filename = `dukaanse-inventory-report-${today}.pdf`;
+  let scopeSlug = 'inventory-report';
+  if (activeFilter.toLowerCase().includes('low stock')) {
+    scopeSlug = 'low-stock-reorder';
+  } else if (activeFilter.toLowerCase().includes('out of stock')) {
+    scopeSlug = 'out-of-stock-alert';
+  } else if (activeFilter.toLowerCase().includes('category:')) {
+    const catName = activeFilter.split(':')[1]?.trim().toLowerCase().replace(/\s+/g, '-') || 'category';
+    scopeSlug = `${catName}-inventory`;
+  }
+
+  const filename = `dukaanse-${scopeSlug}-${today}.pdf`;
   doc.save(filename);
 
   return true;

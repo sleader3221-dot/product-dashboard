@@ -9,7 +9,7 @@ import FilterBar from '@/components/filters/FilterBar';
 import SortDropdown from '@/components/filters/SortDropdown';
 import ActiveFiltersBar from '@/components/filters/ActiveFiltersBar';
 import QuickStats from '@/components/feedback/QuickStats';
-import ExportCSVButton from '@/components/ui/ExportCSVButton';
+import ExportPDFButton from '@/components/ui/ExportPDFButton';
 import Pagination from '@/components/ui/Pagination';
 import ProductGrid from '@/components/products/ProductGrid';
 import ProductModal from '@/components/products/ProductModal';
@@ -19,7 +19,6 @@ import Modal from '@/components/ui/Modal';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import ErrorState from '@/components/ui/ErrorState';
 import EmptyState from '@/components/ui/EmptyState';
-import { exportToPdf } from '@/utils/generatePdf';
 import toast from 'react-hot-toast';
 
 export default function Dashboard() {
@@ -234,36 +233,6 @@ export default function Dashboard() {
     }
   };
 
-  // Executive PDF Inventory Audit Report handler
-  const handleExportPdf = () => {
-    if (!sortedProducts || sortedProducts.length === 0) {
-      toast.error('No products available to generate PDF audit report');
-      return;
-    }
-
-    let activeFilterLabel = 'Full Catalog';
-    if (kpiFilter === 'low_stock') {
-      activeFilterLabel = 'Low Stock Reorder Sheet';
-    } else if (kpiFilter === 'out_of_stock') {
-      activeFilterLabel = 'Out of Stock Alert Sheet';
-    } else if (activeCategory !== 'all') {
-      activeFilterLabel = `Category: ${activeCategory.toUpperCase()}`;
-    } else if (searchInput) {
-      activeFilterLabel = `Search: "${searchInput}"`;
-    }
-
-    toast.success('Generating inventory audit report...');
-
-    try {
-      exportToPdf({
-        products: sortedProducts,
-        activeFilter: activeFilterLabel,
-      });
-    } catch (err) {
-      toast.error('Failed to generate PDF report');
-    }
-  };
-
   // Base catalog: Always use the living allProducts if available
   const baseCatalog =
     allProducts && allProducts.length > 0 ? allProducts : products;
@@ -409,27 +378,14 @@ export default function Dashboard() {
               )}
             </p>
 
-            {/* Actions: Export CSV, Export PDF, and Sort Dropdown */}
-            <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
-              <ExportCSVButton
+            {/* Actions: Executive Export PDF and Sort Dropdown */}
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              <ExportPDFButton
                 products={sortedProducts}
                 kpiFilter={kpiFilter}
                 activeCategory={activeCategory}
+                searchInput={searchInput}
               />
-              <button
-                type="button"
-                onClick={handleExportPdf}
-                title="Download Executive PDF Inventory Audit Report"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs sm:text-sm font-medium transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
-              >
-                <span>📄</span>
-                <span>Export PDF</span>
-                {sortedProducts.length > 0 && (
-                  <span className="text-[11px] text-slate-300 font-normal">
-                    ({sortedProducts.length})
-                  </span>
-                )}
-              </button>
               <SortDropdown value={sortBy} onChange={setSortBy} />
             </div>
           </div>

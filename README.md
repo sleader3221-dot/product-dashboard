@@ -61,7 +61,7 @@ Open [http://localhost:3000](http://localhost:3000)
 - ✅ **Clickable KPI Quick-Filters**: Click on "Total Products", "Low Stock (≤10)", or "Out of Stock" cards to instantly filter the entire catalog.
 - ✅ **Search Clear ("X") & Active Filter Pills Bar**: One-click clear for search queries and multi-pill indicator showing active category, search, and stock filters with individual removal and one-click "Reset all".
 - ✅ **Product Details / Quick View Modal**: Click on any product image or title to open a rich modal with image gallery switcher, rating stars, discount badge, description, and quick edit/delete buttons.
-- ✅ **Export Reorder Sheet (CSV)**: One-click formatted CSV export with smart naming (`dukaanse-low-stock-reorder.csv`, `dukaanse-products.csv`) using pure browser Blobs (UTF-8 BOM support for Excel & Sheets).
+- ✅ **Executive PDF Audit & Reorder Report**: Real-time PDF generator using `jspdf` and `jspdf-autotable` with navy brand header, dynamic valuation, low-stock alerts, autoTable styling, and multi-page confidential footer.
 - ✅ **Client-Side Pagination**: Clean 16 items/page with range indicator (`Showing 1–16 of 194`), windowed page buttons, and smooth scroll to top.
 
 ## 🌟 Top 1% Touches (DukaanSe Kirana & Retail Mindset)
@@ -77,9 +77,9 @@ Open [http://localhost:3000](http://localhost:3000)
    - Stock = 0: Rose Alert with Pulse Animation (`bg-rose-50 text-rose-700`) ➔ `"Out of stock"`
    - *Value for DukaanSe:* Enables local store managers to immediately identify items needing replenishment before stockouts occur.
 
-3. **Operational Sort & CSV Reorder Sheet:**
+3. **Operational Sort & Executive PDF Inventory Audit Report:**
    - Sort by **Default / Featured**, **Price: Low to High**, **Price: High to Low**, **Stock: Low to High (Restock Priority)**, and **Name: A to Z**.
-   - Store owners can filter by "Low Stock", sort by "Stock: Low to High", and click **"Export CSV"** to generate a replenishment order sheet ready for suppliers or WhatsApp distributors.
+   - Store owners can filter by "Low Stock", sort by "Stock: Low to High", and click **"Export PDF"** to generate an executive-grade replenishment audit sheet ready for suppliers, accountants, or store managers.
 
 4. **Product Details & Thumbnail Gallery:**
    - Shop owners can inspect all product images, verify pricing, stock, rating, and description without navigating away from the dashboard.
