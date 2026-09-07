@@ -48,7 +48,7 @@ Open [http://localhost:3000](http://localhost:3000)
 
 - ✅ Product listing with image, name, category, price, and stock
 - ✅ Real-time debounced search by product name
-- ✅ Category filter tabs (API-driven)
+- ✅ Category filter tabs (API-driven with instant zero-latency switching)
 - ✅ Add product with full form validation
 - ✅ Edit product (pre-populated form)
 - ✅ Delete product with confirmation dialog
@@ -58,6 +58,28 @@ Open [http://localhost:3000](http://localhost:3000)
 - ✅ Toast notifications for all operations
 - ✅ Fully responsive (mobile + desktop)
 - ✅ Meaningful Git commit history
+
+## 🌟 Top 1% Touches (DukaanSe Kirana & Retail Mindset)
+
+1. **Dynamic Stock Alert Badges (Inventory Health):**
+   - Stock > 10: Emerald Green (`bg-emerald-50 text-emerald-700`) ➔ `"In stock"`
+   - Stock 1–10: Amber Warning (`bg-amber-50 text-amber-700`) ➔ `"Low stock (X left)"`
+   - Stock = 0: Rose Alert with Pulse Animation (`bg-rose-50 text-rose-700`) ➔ `"Out of stock"`
+   - *Value for DukaanSe:* Enables local store managers to immediately identify items needing replenishment before stockouts occur.
+
+2. **Operational Sort Dropdown (Price & Replenishment Priority):**
+   - Sort by **Default / Featured**
+   - Sort by **Price: Low to High** and **Price: High to Low**
+   - Sort by **Stock: Low to High (Restock Priority)** — allows shopkeepers to instantly generate re-order purchasing lists.
+   - Sort by **Stock: High to Low** and **Name: A to Z**
+
+3. **Store Overview Metrics Pills (Header Counters):**
+   - Real-time KPI summary bar showing:
+     - 📦 **Total Products**
+     - 🏷️ **Active Departments / Categories**
+     - ⚠️ **Low Stock Count (≤10)**
+     - 🚨 **Out of Stock Count**
+   - Provides store owners with an executive snapshot of inventory health with zero performance overhead.
 
 ## Known Limitations
 
