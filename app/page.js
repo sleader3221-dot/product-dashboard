@@ -19,6 +19,7 @@ import Modal from '@/components/ui/Modal';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import ErrorState from '@/components/ui/ErrorState';
 import EmptyState from '@/components/ui/EmptyState';
+import { Sparkles, PackageCheck } from 'lucide-react';
 
 export default function Dashboard() {
   const {
@@ -36,17 +37,18 @@ export default function Dashboard() {
 
   const { categories } = useCategories();
 
-  // Filter & Search states
+  // Search & Filter states
   const [searchInput, setSearchInput] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
-  const [activeStockFilter, setActiveStockFilter] = useState('all'); // 'all' | 'low' | 'out'
+  // KPI Filter: 'all' | 'categories' | 'low_stock' | 'out_of_stock'
+  const [kpiFilter, setKpiFilter] = useState('all');
   const [sortBy, setSortBy] = useState('default');
 
-  // Pagination state (16 products per page)
+  // Client-Side Pagination (16 products per page)
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 16;
 
-  // Modal dialog states
+  // Dialog states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [deletingProduct, setDeletingProduct] = useState(null);
@@ -54,12 +56,12 @@ export default function Dashboard() {
 
   const debouncedSearch = useDebounce(searchInput, 300);
 
-  // Initial products fetch on mount
+  // Initial catalog fetch on mount
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
-  // React to debounced search input with automatic pagination reset
+  // Handle debounced search: instantly resets page to 1
   useEffect(() => {
     setCurrentPage(1);
     if (debouncedSearch.trim()) {
@@ -72,7 +74,7 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
-  // Search input change handler with instant pagination reset
+  // Search input typing handler: instantly resets page to 1
   const handleSearchChange = (e) => {
     const val = e.target.value;
     setSearchInput(val);
@@ -82,7 +84,7 @@ export default function Dashboard() {
     }
   };
 
-  // Clear search input (X button) with instant pagination reset
+  // Clear search input (X button): instantly resets page to 1
   const handleClearSearch = () => {
     setSearchInput('');
     setCurrentPage(1);
@@ -93,7 +95,7 @@ export default function Dashboard() {
     }
   };
 
-  // Category switch handler with instant pagination reset
+  // Category change handler: instantly resets page to 1
   const handleCategoryChange = (category) => {
     setActiveCategory(category);
     setSearchInput('');
@@ -109,36 +111,49 @@ export default function Dashboard() {
     handleCategoryChange('all');
   };
 
-  // Clickable KPI Card filter handler with instant pagination reset
-  const handleSelectStockFilter = (filterKey) => {
+  // Interactive 4 KPI Cards Filter handler:
+  // - Clicking 'Total Products' sets kpiFilter to 'all'
+  // - Clicking 'Low Stock (<10)' sets kpiFilter to 'low_stock'
+  // - Clicking 'Out of Stock' sets kpiFilter to 'out_of_stock'
+  // - Clicking 'Categories' scrolls smoothly to #category-bar
+  // - Clicking any card ALWAYS resets currentPage to 1
+  const handleSelectKpiFilter = (filterKey) => {
     setCurrentPage(1);
-    // Clicking 'Total Products' resets stock filter to 'all'
+
+    if (filterKey === 'categories') {
+      const bar = document.getElementById('category-bar');
+      if (bar) {
+        bar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+
     if (filterKey === 'all') {
-      setActiveStockFilter('all');
-    } else if (activeStockFilter === filterKey) {
-      // Toggle back to 'all' if clicking already active filter
-      setActiveStockFilter('all');
+      setKpiFilter('all');
+    } else if (kpiFilter === filterKey) {
+      // Toggle back to 'all' if clicking already selected filter
+      setKpiFilter('all');
     } else {
-      setActiveStockFilter(filterKey);
+      setKpiFilter(filterKey);
     }
   };
 
-  const handleClearStockFilter = () => {
-    setActiveStockFilter('all');
+  const handleClearKpiFilter = () => {
+    setKpiFilter('all');
     setCurrentPage(1);
   };
 
-  // Global reset for all active filters
+  // Global reset for all filters
   const handleResetAllFilters = () => {
     setSearchInput('');
     setActiveCategory('all');
-    setActiveStockFilter('all');
+    setKpiFilter('all');
     setSortBy('default');
     setCurrentPage(1);
     fetchProducts();
   };
 
-  // Retry query on error state
+  // Retry handler for network error state
   const handleRetry = () => {
     if (debouncedSearch.trim()) {
       searchProducts(debouncedSearch.trim());
@@ -167,7 +182,7 @@ export default function Dashboard() {
     if (success) setDeletingProduct(null);
   };
 
-  // Smooth scroll to top on pagination change
+  // Pagination navigation with smooth scroll
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
     if (typeof window !== 'undefined') {
@@ -175,22 +190,22 @@ export default function Dashboard() {
     }
   };
 
-  // 1. Apply KPI Stock Filter ('all' | 'low' | 'out')
-  const stockFilteredProducts = useMemo(() => {
-    if (activeStockFilter === 'low') {
+  // 1. Filter by KPI Stock Filter ('all' | 'low_stock' | 'out_of_stock')
+  const filteredProducts = useMemo(() => {
+    if (kpiFilter === 'low_stock') {
       return products.filter(
         (p) => Number(p.stock) > 0 && Number(p.stock) <= 10
       );
     }
-    if (activeStockFilter === 'out') {
+    if (kpiFilter === 'out_of_stock') {
       return products.filter((p) => Number(p.stock) === 0);
     }
     return products;
-  }, [products, activeStockFilter]);
+  }, [products, kpiFilter]);
 
-  // 2. Apply Operational Sorting (Price, Stock Replenishment, Name)
+  // 2. Operational Sorting
   const sortedProducts = useMemo(() => {
-    const list = [...stockFilteredProducts];
+    const list = [...filteredProducts];
     switch (sortBy) {
       case 'price-asc':
         return list.sort((a, b) => Number(a.price) - Number(b.price));
@@ -205,9 +220,9 @@ export default function Dashboard() {
       default:
         return list;
     }
-  }, [stockFilteredProducts, sortBy]);
+  }, [filteredProducts, sortBy]);
 
-  // Total pages calculation and auto-clamping
+  // Total pages calculation and boundary auto-clamping
   const totalPages = Math.ceil(sortedProducts.length / pageSize) || 1;
 
   useEffect(() => {
@@ -216,7 +231,7 @@ export default function Dashboard() {
     }
   }, [currentPage, totalPages]);
 
-  // 3. Apply Client-Side Pagination (16 products per page)
+  // 3. Client-Side Pagination Slicing
   const paginatedProducts = useMemo(() => {
     const safePage = Math.min(Math.max(1, currentPage), totalPages);
     const startIndex = (safePage - 1) * pageSize;
@@ -225,7 +240,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50/70">
-      {/* Header Navbar with search input, clear button, and Add Product button */}
+      {/* Header Navbar with integrated search input, X clear button, and Add Product CTA */}
       <Navbar
         searchInput={searchInput}
         onSearchChange={handleSearchChange}
@@ -234,34 +249,34 @@ export default function Dashboard() {
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Executive Kirana Inventory Overview with Clickable KPI Quick-Filters */}
+        {/* Interactive 4 KPI Cards: Instant Filters with active rings & smooth scroll */}
         <QuickStats
           products={allProducts && allProducts.length > 0 ? allProducts : products}
           categories={categories}
-          activeStockFilter={activeStockFilter}
-          onSelectStockFilter={handleSelectStockFilter}
+          kpiFilter={kpiFilter}
+          onSelectKpiFilter={handleSelectKpiFilter}
         />
 
-        {/* Category Filter Tabs via FilterBar */}
+        {/* Category Filter Tabs via FilterBar (#category-bar) */}
         <FilterBar
           categories={categories}
           activeCategory={activeCategory}
           onSelectCategory={handleCategoryChange}
         />
 
-        {/* Active Filters Bar (Shown only when any filter is active) */}
+        {/* Active Filters Bar (Shows pills with individual removal & Reset button) */}
         <ActiveFiltersBar
           searchInput={searchInput}
           activeCategory={activeCategory}
-          activeStockFilter={activeStockFilter}
+          kpiFilter={kpiFilter}
           resultCount={sortedProducts.length}
           onClearSearch={handleClearSearch}
           onClearCategory={handleClearCategory}
-          onClearStockFilter={handleClearStockFilter}
+          onClearKpiFilter={handleClearKpiFilter}
           onResetAll={handleResetAllFilters}
         />
 
-        {/* Toolbar: Count indicator, CSV Export, and Sort Dropdown */}
+        {/* Toolbar: Result Count, [⬇ Export CSV], and Sort Dropdown */}
         {!loading && !error && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-3 border-b border-gray-200">
             <p className="text-xs sm:text-sm text-gray-500 font-medium">
@@ -280,9 +295,14 @@ export default function Dashboard() {
                   </span>
                 </span>
               )}
-              {activeStockFilter !== 'all' && (
+              {kpiFilter === 'low_stock' && (
                 <span className="ml-1 text-amber-700 font-medium">
-                  • {activeStockFilter === 'low' ? 'Low Stock Filtered' : 'Out of Stock Filtered'}
+                  • Low Stock (&le;10) Filtered
+                </span>
+              )}
+              {kpiFilter === 'out_of_stock' && (
+                <span className="ml-1 text-rose-700 font-medium">
+                  • Out of Stock Filtered
                 </span>
               )}
             </p>
@@ -291,7 +311,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-2 self-end sm:self-auto">
               <ExportCSVButton
                 products={sortedProducts}
-                activeStockFilter={activeStockFilter}
+                kpiFilter={kpiFilter}
                 activeCategory={activeCategory}
               />
               <SortDropdown value={sortBy} onChange={setSortBy} />
@@ -306,10 +326,38 @@ export default function Dashboard() {
           <ErrorState message={error} onRetry={handleRetry} />
         )}
 
-        {!loading && !error && sortedProducts.length === 0 && (
+        {/* Special Out of Stock Friendly Empty State */}
+        {!loading && !error && kpiFilter === 'out_of_stock' && sortedProducts.length === 0 && (
+          <div className="text-center py-16 px-4 bg-white rounded-2xl border border-emerald-100 shadow-xs my-6">
+            <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+              🎉
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">
+              All Items Are In Stock!
+            </h3>
+            <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
+              Your inventory is in great shape. No products are currently out of stock.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setKpiFilter('all');
+                setCurrentPage(1);
+              }}
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all shadow-sm shadow-blue-200 cursor-pointer active:scale-95"
+            >
+              <PackageCheck className="h-4 w-4" />
+              View All Products
+            </button>
+          </div>
+        )}
+
+        {/* Standard Empty State for queries with no results */}
+        {!loading && !error && kpiFilter !== 'out_of_stock' && sortedProducts.length === 0 && (
           <EmptyState query={searchInput} />
         )}
 
+        {/* Product Grid and Pagination */}
         {!loading && !error && paginatedProducts.length > 0 && (
           <>
             <ProductGrid
@@ -347,7 +395,7 @@ export default function Dashboard() {
         onSubmit={handleUpdateProduct}
       />
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal (Double-confirmation safety) */}
       <Modal
         isOpen={Boolean(deletingProduct)}
         onClose={() => setDeletingProduct(null)}
@@ -370,6 +418,7 @@ export default function Dashboard() {
           setEditingProduct(prod);
         }}
         onDelete={(prod) => {
+          // Double-confirmation: Closes Quick View and opens Delete Confirmation dialog
           setQuickViewProduct(null);
           setDeletingProduct(prod);
         }}

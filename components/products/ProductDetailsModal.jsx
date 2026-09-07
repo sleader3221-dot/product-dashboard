@@ -1,10 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Star, Package, Pencil, Trash2, ShieldCheck, Truck, Tag } from 'lucide-react';
+import { Star, Package, Pencil, Trash2, RotateCcw, Truck, Tag } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import StatusBadge from '@/components/feedback/StatusBadge';
 
+/**
+ * ProductDetailsModal / QuickViewModal
+ * Enhanced Quick View modal with:
+ * - Multi-image thumbnail gallery (48x48px) with instant preview switcher
+ * - Realistic retail copy ("Store Unit Price", subtle "Brand: Generic", "★ 3.1 / 5.0 (Customer Rating)")
+ * - Conditioned return policy instead of awkward 1-year warranty on groceries/beauty
+ * - Dynamic stock status badge (In Stock, Low Stock <= 10, Out of Stock)
+ * - Safe double-confirmation delete trigger
+ */
 export default function ProductDetailsModal({
   product,
   isOpen,
@@ -15,7 +24,7 @@ export default function ProductDetailsModal({
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [imgError, setImgError] = useState(false);
 
-  // Reset active image when product changes
+  // Reset active image index whenever the product changes
   useEffect(() => {
     setActiveImageIndex(0);
     setImgError(false);
@@ -23,12 +32,13 @@ export default function ProductDetailsModal({
 
   if (!product) return null;
 
-  // Gather available images
-  const images = Array.isArray(product.images) && product.images.length > 0
-    ? product.images
-    : product.thumbnail
-    ? [product.thumbnail]
-    : [];
+  // Gather available images with fallback to thumbnail
+  const images =
+    Array.isArray(product.images) && product.images.length > 0
+      ? product.images
+      : product.thumbnail
+      ? [product.thumbnail]
+      : [];
 
   const currentImage = images[activeImageIndex] || product.thumbnail;
 
@@ -36,19 +46,37 @@ export default function ProductDetailsModal({
   const discount = Number(product.discountPercentage) || 0;
   const originalPrice = discount > 0 ? price / (1 - discount / 100) : null;
   const stock = Number(product.stock) || 0;
+  const rating = product.rating ? Number(product.rating).toFixed(1) : '4.5';
+
+  const isConsumable =
+    product.category?.toLowerCase() === 'groceries' ||
+    product.category?.toLowerCase() === 'beauty' ||
+    product.category?.toLowerCase() === 'food';
+
+  const returnPolicyText =
+    product.returnPolicy ||
+    (isConsumable ? '7-day freshness guarantee' : '30-day store return policy');
+
+  const logisticsText =
+    product.shippingInformation || 'Ships overnight or next-day pickup';
+
+  const brandText =
+    product.brand && product.brand.trim() !== ''
+      ? product.brand
+      : 'Generic';
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Product Quick View">
-      <div className="space-y-6">
-        {/* Main Image and Gallery Row */}
+      <div className="space-y-5">
+        {/* Main Image and Gallery Strip */}
         <div className="space-y-3">
-          {/* Main Large Image */}
+          {/* Main Large Preview Image */}
           <div className="relative h-64 sm:h-72 w-full bg-gray-50 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
             {!imgError && currentImage ? (
               <img
                 src={currentImage}
                 alt={product.title}
-                className="h-full w-full object-contain p-2"
+                className="h-full w-full object-contain p-2 transition-all duration-200"
                 onError={() => setImgError(true)}
               />
             ) : (
@@ -56,38 +84,40 @@ export default function ProductDetailsModal({
             )}
 
             {/* Category Tag */}
-            <span className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-gray-700 text-xs font-semibold px-2.5 py-1 rounded-full shadow-sm capitalize border border-gray-100 flex items-center gap-1">
+            <span className="absolute top-3 left-3 bg-white/95 backdrop-blur-xs text-gray-700 text-xs font-semibold px-2.5 py-1 rounded-full shadow-xs capitalize border border-gray-100 flex items-center gap-1">
               <Tag className="h-3 w-3 text-blue-600" />
               {product.category}
             </span>
 
             {/* Discount Tag */}
             {discount > 0 && (
-              <span className="absolute top-3 right-3 bg-rose-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">
+              <span className="absolute top-3 right-3 bg-rose-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-xs">
                 {Math.round(discount)}% OFF
               </span>
             )}
           </div>
 
-          {/* Multi-Image Thumbnails Carousel */}
+          {/* Multi-Image Thumbnail Previews Row (48x48px: w-12 h-12) */}
           {images.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <div className="flex items-center justify-center gap-2 overflow-x-auto pb-1 scrollbar-none">
               {images.map((imgUrl, idx) => (
                 <button
+                  type="button"
                   key={idx}
                   onClick={() => {
                     setActiveImageIndex(idx);
                     setImgError(false);
                   }}
-                  className={`relative w-14 h-14 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${
+                  className={`relative w-12 h-12 rounded-lg overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
                     activeImageIndex === idx
-                      ? 'border-blue-600 ring-2 ring-blue-100'
+                      ? 'border-blue-600 ring-2 ring-blue-100 opacity-100 scale-105'
                       : 'border-gray-200 hover:border-gray-300 opacity-70 hover:opacity-100'
                   }`}
+                  aria-label={`View image ${idx + 1}`}
                 >
                   <img
                     src={imgUrl}
-                    alt={`${product.title} preview ${idx + 1}`}
+                    alt={`${product.title} thumbnail ${idx + 1}`}
                     className="w-full h-full object-cover"
                   />
                 </button>
@@ -98,28 +128,26 @@ export default function ProductDetailsModal({
 
         {/* Product Details & Attributes */}
         <div>
-          {/* Brand & SKU */}
-          <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
-            <span className="font-semibold text-gray-500 uppercase tracking-wider">
-              Brand: {product.brand || 'Generic'}
+          {/* Brand & SKU Header */}
+          <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+            <span>
+              Brand: <span className="text-gray-700 font-semibold">{brandText}</span>
             </span>
-            {product.sku && <span>SKU: {product.sku}</span>}
+            {product.sku && <span className="text-gray-400 font-mono">SKU: {product.sku}</span>}
           </div>
 
           {/* Title */}
-          <h2 className="text-xl font-bold text-gray-900 leading-snug mb-2">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 leading-snug mb-1.5">
             {product.title}
           </h2>
 
           {/* Rating */}
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-1.5 mb-3 text-xs sm:text-sm">
             <div className="flex items-center text-amber-500">
               <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-              <span className="text-sm font-bold ml-1 text-gray-800">
-                {product.rating ? Number(product.rating).toFixed(1) : '4.5'}
-              </span>
+              <span className="font-bold ml-1 text-gray-800">{rating}</span>
             </div>
-            <span className="text-xs text-gray-400">• Verified Retail Product</span>
+            <span className="text-gray-400">/ 5.0 (Customer Rating)</span>
           </div>
 
           {/* Price & Stock Row */}
@@ -135,7 +163,7 @@ export default function ProductDetailsModal({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-500 mt-0.5">Wholesale Unit Price</p>
+              <p className="text-xs text-gray-500 mt-0.5 font-medium">Store Unit Price</p>
             </div>
 
             <div className="text-right">
@@ -149,46 +177,49 @@ export default function ProductDetailsModal({
           {/* Description */}
           {product.description && (
             <div className="mb-4">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">
                 Description
               </h4>
-              <p className="text-sm text-gray-600 leading-relaxed bg-white border border-gray-100 rounded-lg p-3">
+              <p className="text-xs sm:text-sm text-gray-600 leading-relaxed bg-white border border-gray-100 rounded-lg p-3">
                 {product.description}
               </p>
             </div>
           )}
 
           {/* Retail Logistics Info */}
-          <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 pt-2 border-t border-gray-100">
-            <div className="flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4 text-emerald-600" />
-              <span>{product.warrantyInformation || '1 Year Store Warranty'}</span>
+          <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 pt-3 border-t border-gray-100">
+            <div className="flex items-center gap-1.5 bg-gray-50/80 px-2.5 py-1.5 rounded-lg">
+              <RotateCcw className="h-4 w-4 text-emerald-600 shrink-0" />
+              <span className="truncate" title={returnPolicyText}>{returnPolicyText}</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Truck className="h-4 w-4 text-blue-600" />
-              <span>{product.shippingInformation || 'Ships in 1-2 Days'}</span>
+            <div className="flex items-center gap-1.5 bg-gray-50/80 px-2.5 py-1.5 rounded-lg">
+              <Truck className="h-4 w-4 text-blue-600 shrink-0" />
+              <span className="truncate" title={logisticsText}>{logisticsText}</span>
             </div>
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons: Double-Confirmation Delete */}
         <div className="flex items-center gap-3 pt-2">
           <button
+            type="button"
             onClick={() => {
               onClose();
               onEdit(product);
             }}
-            className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition-colors shadow-sm"
+            className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-xl text-sm transition-colors shadow-xs cursor-pointer"
           >
             <Pencil className="h-4 w-4" />
             Edit Product
           </button>
           <button
+            type="button"
             onClick={() => {
+              // Open Delete Confirmation modal for double-confirmation
               onClose();
               onDelete(product);
             }}
-            className="inline-flex items-center justify-center gap-1.5 border border-red-200 text-red-600 hover:bg-red-50 font-medium py-2.5 px-4 rounded-xl text-sm transition-colors"
+            className="inline-flex items-center justify-center gap-1.5 border border-red-200 text-red-600 hover:bg-red-50 font-medium py-2 px-4 rounded-xl text-sm transition-colors cursor-pointer"
           >
             <Trash2 className="h-4 w-4" />
             Delete

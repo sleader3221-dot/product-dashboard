@@ -1,48 +1,33 @@
 /**
  * Utility to export an array of product objects to a downloadable CSV file.
- * Formats fields safely with quotes to handle commas, quotes, and line breaks.
- * Filename format: dukaanse-products-YYYY-MM-DD.csv
+ * Formats fields safely with RFC 4180 quotes to handle commas, quotes, and line breaks.
+ * Headers: ID, Title, Category, Price, Stock, Rating, SKU
+ * Filename format: dukaanse-inventory-YYYY-MM-DD.csv
  */
 export function exportProductsToCSV(products, customFilename) {
   if (!products || products.length === 0) return false;
 
-  const today = new Date().toISOString().split('T')[0];
-  const filename = customFilename || `dukaanse-products-${today}.csv`;
+  const today = new Date().toISOString().slice(0, 10);
+  const filename = customFilename || `dukaanse-inventory-${today}.csv`;
 
-  const headers = [
-    'ID',
-    'Title',
-    'Category',
-    'Price ($)',
-    'Stock Qty',
-    'Inventory Status',
-    'Brand',
-    'Rating',
-    'Discount (%)',
-  ];
-
-  const escapeCSV = (val) => {
-    if (val === null || val === undefined) return '""';
-    const str = String(val).replace(/"/g, '""');
-    return `"${str}"`;
-  };
+  const headers = ['ID', 'Title', 'Category', 'Price', 'Stock', 'Rating', 'SKU'];
 
   const rows = products.map((p) => {
+    const title = p.title || '';
+    const category = p.category || '';
+    const price = (Number(p.price) || 0).toFixed(2);
     const stock = Number(p.stock) || 0;
-    let status = 'In Stock';
-    if (stock === 0) status = 'Out of Stock';
-    else if (stock <= 10) status = `Low Stock (${stock} left)`;
+    const rating = p.rating ? Number(p.rating).toFixed(1) : 'N/A';
+    const sku = p.sku || `SKU-${p.id}`;
 
     return [
-      escapeCSV(p.id),
-      escapeCSV(p.title),
-      escapeCSV(p.category),
-      escapeCSV((Number(p.price) || 0).toFixed(2)),
-      escapeCSV(stock),
-      escapeCSV(status),
-      escapeCSV(p.brand || 'Generic'),
-      escapeCSV(p.rating || 'N/A'),
-      escapeCSV(p.discountPercentage || 0),
+      p.id,
+      `"${String(title).replace(/"/g, '""')}"`,
+      `"${String(category).replace(/"/g, '""')}"`,
+      price,
+      stock,
+      rating,
+      `"${String(sku).replace(/"/g, '""')}"`,
     ].join(',');
   });
 
