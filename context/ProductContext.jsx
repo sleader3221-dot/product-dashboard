@@ -18,6 +18,7 @@ const ACTIONS = {
 
 const initialState = {
   products: [],
+  allProducts: [],
   loading: false,
   error: null,
   searchQuery: '',
@@ -30,14 +31,33 @@ function productReducer(state, action) {
       return { ...state, loading: action.payload, error: null };
     case ACTIONS.SET_ERROR:
       return { ...state, loading: false, error: action.payload };
-    case ACTIONS.SET_PRODUCTS:
-      return { ...state, loading: false, error: null, products: action.payload };
+    case ACTIONS.SET_PRODUCTS: {
+      const isInitialOrAll =
+        state.selectedCategory === 'all' && !state.searchQuery;
+      return {
+        ...state,
+        loading: false,
+        error: null,
+        products: action.payload,
+        allProducts:
+          isInitialOrAll || state.allProducts.length === 0
+            ? action.payload
+            : state.allProducts,
+      };
+    }
     case ACTIONS.ADD_PRODUCT:
-      return { ...state, products: [action.payload, ...state.products] };
+      return {
+        ...state,
+        products: [action.payload, ...state.products],
+        allProducts: [action.payload, ...state.allProducts],
+      };
     case ACTIONS.UPDATE_PRODUCT:
       return {
         ...state,
         products: state.products.map((p) =>
+          p.id === action.payload.id ? { ...p, ...action.payload } : p
+        ),
+        allProducts: state.allProducts.map((p) =>
           p.id === action.payload.id ? { ...p, ...action.payload } : p
         ),
       };
@@ -45,6 +65,7 @@ function productReducer(state, action) {
       return {
         ...state,
         products: state.products.filter((p) => p.id !== action.payload),
+        allProducts: state.allProducts.filter((p) => p.id !== action.payload),
       };
     case ACTIONS.SET_SEARCH:
       return { ...state, searchQuery: action.payload };
@@ -66,7 +87,10 @@ export function ProductProvider({ children }) {
       const data = await productApi.getAll();
       dispatch({ type: ACTIONS.SET_PRODUCTS, payload: data.products || [] });
     } catch (err) {
-      dispatch({ type: ACTIONS.SET_ERROR, payload: err.message || 'Failed to load products' });
+      dispatch({
+        type: ACTIONS.SET_ERROR,
+        payload: err.message || 'Failed to load products',
+      });
       toast.error('Failed to load products');
     }
   }, []);
@@ -77,7 +101,10 @@ export function ProductProvider({ children }) {
       const data = await productApi.getByCategory(category);
       dispatch({ type: ACTIONS.SET_PRODUCTS, payload: data.products || [] });
     } catch (err) {
-      dispatch({ type: ACTIONS.SET_ERROR, payload: err.message || 'Failed to filter products' });
+      dispatch({
+        type: ACTIONS.SET_ERROR,
+        payload: err.message || 'Failed to filter products',
+      });
     }
   }, []);
 
@@ -87,7 +114,10 @@ export function ProductProvider({ children }) {
       const data = await productApi.search(query);
       dispatch({ type: ACTIONS.SET_PRODUCTS, payload: data.products || [] });
     } catch (err) {
-      dispatch({ type: ACTIONS.SET_ERROR, payload: err.message || 'Failed to search products' });
+      dispatch({
+        type: ACTIONS.SET_ERROR,
+        payload: err.message || 'Failed to search products',
+      });
     }
   }, []);
 
@@ -95,10 +125,9 @@ export function ProductProvider({ children }) {
     const toastId = toast.loading('Adding product...');
     try {
       const newProduct = await productApi.add(productData);
-      // Optimistic: DummyJSON returns the new product with id
       dispatch({
         type: ACTIONS.ADD_PRODUCT,
-        payload: { ...newProduct, id: Date.now() },
+        payload: newProduct,
       });
       toast.success('Product added successfully!', { id: toastId });
       return true;
@@ -111,10 +140,10 @@ export function ProductProvider({ children }) {
   const updateProduct = useCallback(async (id, productData) => {
     const toastId = toast.loading('Updating product...');
     try {
-      await productApi.update(id, productData);
+      const updated = await productApi.update(id, productData);
       dispatch({
         type: ACTIONS.UPDATE_PRODUCT,
-        payload: { id, ...productData },
+        payload: updated || { id, ...productData },
       });
       toast.success('Product updated!', { id: toastId });
       return true;
@@ -147,8 +176,7 @@ export function ProductProvider({ children }) {
         addProduct,
         updateProduct,
         deleteProduct,
-        setSearch: (q) =>
-          dispatch({ type: ACTIONS.SET_SEARCH, payload: q }),
+        setSearch: (q) => dispatch({ type: ACTIONS.SET_SEARCH, payload: q }),
         setCategory: (c) =>
           dispatch({ type: ACTIONS.SET_CATEGORY, payload: c }),
       }}

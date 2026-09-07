@@ -19,6 +19,7 @@ import EmptyState from '@/components/ui/EmptyState';
 export default function Dashboard() {
   const {
     products,
+    allProducts,
     loading,
     error,
     fetchProducts,
@@ -132,7 +133,10 @@ export default function Dashboard() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {/* Executive Kirana Inventory Overview Pills */}
-        <QuickStats products={products} categories={categories} />
+        <QuickStats
+          products={allProducts && allProducts.length > 0 ? allProducts : products}
+          categories={categories}
+        />
 
         {/* Category Filter tabs */}
         <CategoryFilter
