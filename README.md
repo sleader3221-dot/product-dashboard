@@ -4,7 +4,7 @@ A fully responsive product management dashboard built with Next.js and Tailwind 
 
 ## Live Demo
 
-[https://your-app.vercel.app](https://product-dashboard-steel-two.vercel.app/)
+[https://product-dashboard-steel-two.vercel.app/](https://product-dashboard-steel-two.vercel.app/)
 
 ## Setup Instructions
 
