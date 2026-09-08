@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Star, Package, Pencil, Trash2, RotateCcw, Truck, Tag } from 'lucide-react';
+import { Star, Package, Pencil, Trash2, RotateCcw, Truck, Tag, Copy, Check, MessageCircle } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import StatusBadge from '@/components/feedback/StatusBadge';
+import toast from 'react-hot-toast';
 
 /**
  * ProductDetailsModal / QuickViewModal
@@ -23,11 +24,13 @@ export default function ProductDetailsModal({
 }) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [imgError, setImgError] = useState(false);
+  const [copiedSku, setCopiedSku] = useState(false);
 
   // Reset active image index whenever the product changes
   useEffect(() => {
     setActiveImageIndex(0);
     setImgError(false);
+    setCopiedSku(false);
   }, [product]);
 
   if (!product) return null;
@@ -133,7 +136,29 @@ export default function ProductDetailsModal({
             <span>
               Brand: <span className="text-gray-700 font-semibold">{brandText}</span>
             </span>
-            {product.sku && <span className="text-gray-400 font-mono">SKU: {product.sku}</span>}
+            <button
+              type="button"
+              onClick={async () => {
+                const skuVal = product.sku || `SKU-${product.id}`;
+                try {
+                  await navigator.clipboard.writeText(skuVal);
+                  setCopiedSku(true);
+                  toast.success(`SKU "${skuVal}" copied to clipboard`);
+                  setTimeout(() => setCopiedSku(false), 2000);
+                } catch {
+                  toast.error('Failed to copy SKU');
+                }
+              }}
+              className="inline-flex items-center gap-1 font-mono text-xs text-gray-500 hover:text-blue-600 bg-gray-100 hover:bg-blue-50 px-2 py-0.5 rounded transition-colors cursor-pointer"
+              title="Click to copy SKU"
+            >
+              <span>SKU: {product.sku || `SKU-${product.id}`}</span>
+              {copiedSku ? (
+                <Check className="h-3 w-3 text-emerald-600" />
+              ) : (
+                <Copy className="h-3 w-3 text-gray-400 hover:text-blue-600" />
+              )}
+            </button>
           </div>
 
           {/* Title */}
@@ -199,8 +224,21 @@ export default function ProductDetailsModal({
           </div>
         </div>
 
-        {/* Action Buttons: Double-Confirmation Delete */}
-        <div className="flex items-center gap-3 pt-2">
+        {/* Action Buttons: WhatsApp Reorder + Edit + Double-Confirmation Delete */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-2">
+          {stock <= 10 && (
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(
+                `🛒 DukaanSe Reorder Request\nProduct: ${product.title}\nSKU: ${product.sku || `SKU-${product.id}`}\nCurrent Stock: ${stock} units\nCategory: ${product.category || 'General'}\nRequested Qty: 50 units`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-xl text-sm transition-colors shadow-xs cursor-pointer"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Reorder via WhatsApp
+            </a>
+          )}
           <button
             type="button"
             onClick={() => {

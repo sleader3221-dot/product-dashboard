@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useProductContext } from '@/context/ProductContext';
 import { useCategories } from '@/hooks/useCategories';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -12,6 +12,7 @@ import QuickStats from '@/components/feedback/QuickStats';
 import ExportPDFButton from '@/components/ui/ExportPDFButton';
 import Pagination from '@/components/ui/Pagination';
 import ProductGrid from '@/components/products/ProductGrid';
+import ProductTable from '@/components/products/ProductTable';
 import ProductModal from '@/components/products/ProductModal';
 import DeleteConfirm from '@/components/products/DeleteConfirm';
 import ProductDetailsModal from '@/components/products/ProductDetailsModal';
@@ -19,6 +20,9 @@ import Modal from '@/components/ui/Modal';
 import LoadingSkeleton from '@/components/ui/LoadingSkeleton';
 import ErrorState from '@/components/ui/ErrorState';
 import EmptyState from '@/components/ui/EmptyState';
+import BulkActionBar from '@/components/ui/BulkActionBar';
+import NetworkBanner from '@/components/ui/NetworkBanner';
+import { LayoutGrid, List } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function Dashboard() {
@@ -48,6 +52,11 @@ export default function Dashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 16;
 
+  // View Mode: 'grid' | 'table'
+  const [viewMode, setViewMode] = useState('grid');
+  // Bulk selection: Set of product IDs
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
   // Dialog states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -55,15 +64,21 @@ export default function Dashboard() {
   const [quickViewProduct, setQuickViewProduct] = useState(null);
 
   const debouncedSearch = useDebounce(searchInput, 300);
+  const isInitialMount = useRef(true);
 
   // Initial catalog fetch on mount
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
-  // Handle debounced search: instantly resets page to 1
+  // Handle debounced search: instantly resets page to 1 and clears selection
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     setCurrentPage(1);
+    setSelectedIds(new Set());
     if (debouncedSearch.trim()) {
       searchProducts(debouncedSearch.trim());
     } else if (activeCategory === 'all') {
@@ -74,20 +89,22 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
-  // Search input typing handler: resets pagination to 1
+  // Search input typing handler: resets pagination to 1 and clears selection
   const handleSearchChange = (e) => {
     const val = e.target.value;
     setSearchInput(val);
     setCurrentPage(1);
+    setSelectedIds(new Set());
     if (val.trim() && activeCategory !== 'all') {
       setActiveCategory('all');
     }
   };
 
-  // Clear search input (X button): resets pagination to 1
+  // Clear search input (X button): resets pagination to 1 and clears selection
   const handleClearSearch = () => {
     setSearchInput('');
     setCurrentPage(1);
+    setSelectedIds(new Set());
     if (activeCategory === 'all') {
       fetchProducts();
     } else {
@@ -95,11 +112,12 @@ export default function Dashboard() {
     }
   };
 
-  // Category change handler: resets pagination to 1
+  // Category change handler: resets pagination to 1 and clears selection
   const handleCategoryChange = (category) => {
     setActiveCategory(category);
     setSearchInput('');
     setCurrentPage(1);
+    setSelectedIds(new Set());
     if (category === 'all') {
       setKpiFilter('all');
       fetchProducts();
@@ -121,6 +139,7 @@ export default function Dashboard() {
   // - Clicking any card ALWAYS resets currentPage to 1
   const handleSelectKpiFilter = (filterKey) => {
     setCurrentPage(1);
+    setSelectedIds(new Set());
 
     if (filterKey === 'categories') {
       setKpiFilter('categories');
@@ -183,6 +202,7 @@ export default function Dashboard() {
     setKpiFilter('all');
     setActiveCategory('all');
     setCurrentPage(1);
+    setSelectedIds(new Set());
     fetchProducts();
   };
 
@@ -193,6 +213,7 @@ export default function Dashboard() {
     setKpiFilter('all');
     setSortBy('default');
     setCurrentPage(1);
+    setSelectedIds(new Set());
     fetchProducts();
   };
 
@@ -225,17 +246,108 @@ export default function Dashboard() {
     if (success) setDeletingProduct(null);
   };
 
-  // Pagination navigation with smooth scroll
+  // Pagination navigation with smooth scroll and selection reset
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
+    setSelectedIds(new Set());
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 250, behavior: 'smooth' });
     }
   };
 
-  // Base catalog: Always use the living allProducts if available
-  const baseCatalog =
-    allProducts && allProducts.length > 0 ? allProducts : products;
+  // Bulk selection handlers
+  const handleToggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllOnPage = () => {
+    const pageIds = paginatedProducts.map((p) => p.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        pageIds.forEach((id) => next.delete(id));
+      } else {
+        pageIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  // Bulk Restock: Add +10 units to each selected product
+  const handleBulkRestock = async () => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    const toastId = toast.loading(`Restocking ${count} products (+10 units)...`);
+    try {
+      const ids = Array.from(selectedIds);
+      for (const id of ids) {
+        const prod = (allProducts || products).find((p) => Number(p.id) === Number(id));
+        if (prod) {
+          const currentStock = Number(prod.stock) || 0;
+          await updateProduct(id, { stock: currentStock + 10 });
+        }
+      }
+      toast.success(`Restocked ${count} products (+10 units)!`, { id: toastId });
+      setSelectedIds(new Set());
+    } catch {
+      toast.error('Failed to restock some products', { id: toastId });
+    }
+  };
+
+  // Bulk Delete: Delete all selected products with confirmation
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${count} selected product${
+          count > 1 ? 's' : ''
+        }? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    const toastId = toast.loading(`Deleting ${count} products...`);
+    try {
+      const ids = Array.from(selectedIds);
+      for (const id of ids) {
+        await deleteProduct(id);
+      }
+      toast.success(`Deleted ${count} products!`, { id: toastId });
+      setSelectedIds(new Set());
+    } catch {
+      toast.error('Failed to delete some products', { id: toastId });
+    }
+  };
+
+  // Base catalog: Always use the living allProducts if available, deduplicated by ID
+  const baseCatalog = useMemo(() => {
+    const source = allProducts && allProducts.length > 0 ? allProducts : products;
+    if (!source || source.length === 0) return [];
+    const seen = new Set();
+    const unique = [];
+    for (const p of source) {
+      const id = Number(p.id);
+      if (!seen.has(id)) {
+        seen.add(id);
+        unique.push(p);
+      }
+    }
+    return unique;
+  }, [allProducts, products]);
 
   // 1. Unified Multi-Stage Filter Pipeline
   const filteredProducts = useMemo(() => {
@@ -308,8 +420,16 @@ export default function Dashboard() {
     return sortedProducts.slice(startIndex, startIndex + pageSize);
   }, [sortedProducts, currentPage, totalPages, pageSize]);
 
+  // Check if all items on current page are selected
+  const allOnPageSelected =
+    paginatedProducts.length > 0 &&
+    paginatedProducts.every((p) => selectedIds.has(p.id));
+
   return (
     <div className="min-h-screen bg-gray-50/70">
+      {/* Real-Time Network Offline/Online Detection Banner */}
+      <NetworkBanner />
+
       {/* Header Navbar with integrated search input, X clear button, and Add Product CTA */}
       <Navbar
         searchInput={searchInput}
@@ -347,7 +467,7 @@ export default function Dashboard() {
           onResetAll={handleResetAllFilters}
         />
 
-        {/* Toolbar: Result Count, [⬇ Export CSV], and Sort Dropdown */}
+        {/* Toolbar: Result Count, [📄 Export PDF], View Toggle, and Sort Dropdown */}
         {!loading && !error && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-3 border-b border-gray-200">
             <p className="text-xs sm:text-sm text-gray-500 font-medium">
@@ -378,14 +498,45 @@ export default function Dashboard() {
               )}
             </p>
 
-            {/* Actions: Executive Export PDF and Sort Dropdown */}
-            <div className="flex items-center gap-2 self-end sm:self-auto">
+            {/* Actions: Executive Export PDF, View Mode Toggle, and Sort Dropdown */}
+            <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
               <ExportPDFButton
                 products={sortedProducts}
                 kpiFilter={kpiFilter}
                 activeCategory={activeCategory}
                 searchInput={searchInput}
               />
+
+              {/* View Mode Toggle: Grid vs High-Density Table */}
+              <div className="inline-flex items-center p-0.5 bg-gray-200/80 rounded-lg border border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                    viewMode === 'grid'
+                      ? 'bg-white text-blue-600 shadow-xs'
+                      : 'text-gray-500 hover:text-gray-800'
+                  }`}
+                  aria-label="Grid View"
+                  title="Grid View"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('table')}
+                  className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                    viewMode === 'table'
+                      ? 'bg-white text-blue-600 shadow-xs'
+                      : 'text-gray-500 hover:text-gray-800'
+                  }`}
+                  aria-label="Table View"
+                  title="Table View"
+                >
+                  <List className="h-4 w-4" />
+                </button>
+              </div>
+
               <SortDropdown value={sortBy} onChange={setSortBy} />
             </div>
           </div>
@@ -411,15 +562,30 @@ export default function Dashboard() {
           />
         )}
 
-        {/* Product Grid and Pagination */}
+        {/* Product Grid / Table and Pagination */}
         {!loading && !error && paginatedProducts.length > 0 && (
           <>
-            <ProductGrid
-              products={paginatedProducts}
-              onEdit={setEditingProduct}
-              onDelete={setDeletingProduct}
-              onQuickView={setQuickViewProduct}
-            />
+            {viewMode === 'grid' ? (
+              <ProductGrid
+                products={paginatedProducts}
+                onEdit={setEditingProduct}
+                onDelete={setDeletingProduct}
+                onQuickView={setQuickViewProduct}
+                selectedIds={selectedIds}
+                onToggleSelect={handleToggleSelect}
+              />
+            ) : (
+              <ProductTable
+                products={paginatedProducts}
+                onEdit={setEditingProduct}
+                onDelete={setDeletingProduct}
+                onQuickView={setQuickViewProduct}
+                selectedIds={selectedIds}
+                onToggleSelect={handleToggleSelect}
+                onSelectAllOnPage={handleSelectAllOnPage}
+                allOnPageSelected={allOnPageSelected}
+              />
+            )}
 
             {/* Client-Side Pagination Controls */}
             <Pagination
@@ -476,6 +642,14 @@ export default function Dashboard() {
           setQuickViewProduct(null);
           setDeletingProduct(prod);
         }}
+      />
+
+      {/* Floating Batch Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        onRestock={handleBulkRestock}
+        onBulkDelete={handleBulkDelete}
+        onDeselectAll={handleDeselectAll}
       />
     </div>
   );

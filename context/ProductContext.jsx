@@ -16,11 +16,14 @@ function getStoredMutations() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { created: [], updated: {}, deleted: [] };
     const parsed = JSON.parse(raw);
-    return {
-      created: Array.isArray(parsed.created) ? parsed.created : [],
-      updated: parsed.updated && typeof parsed.updated === 'object' ? parsed.updated : {},
-      deleted: Array.isArray(parsed.deleted) ? parsed.deleted : [],
-    };
+    const created = Array.isArray(parsed.created) ? parsed.created : [];
+    const createdIds = new Set(created.map((p) => Number(p.id)));
+    // Clean deleted: any actively created product must NEVER be considered deleted
+    const deleted = (Array.isArray(parsed.deleted) ? parsed.deleted : []).filter(
+      (id) => !createdIds.has(Number(id))
+    );
+    const updated = parsed.updated && typeof parsed.updated === 'object' ? parsed.updated : {};
+    return { created, updated, deleted };
   } catch {
     return { created: [], updated: {}, deleted: [] };
   }
@@ -40,29 +43,60 @@ function saveStoredMutations(mutations) {
  * 1. Excludes deleted product IDs
  * 2. Overwrites fields for edited products
  * 3. Prepends newly created custom products
+ * 4. Deduplicates strictly by numeric ID to prevent React duplicate key collisions on refresh
  */
 function applyMutations(rawList, mutations) {
-  const deletedSet = new Set((mutations.deleted || []).map((id) => Number(id)));
-  const updatedMap = mutations.updated || {};
-  const createdList = mutations.created || [];
+  const createdList = Array.isArray(mutations?.created) ? mutations.created : [];
+  const updatedMap =
+    mutations?.updated && typeof mutations.updated === 'object'
+      ? mutations.updated
+      : {};
+  const deletedSet = new Set((mutations?.deleted || []).map((id) => Number(id)));
 
-  // Filter out deleted and merge updates
-  const processedRaw = rawList
-    .filter((p) => !deletedSet.has(Number(p.id)))
+  // Active custom products must NEVER be treated as deleted
+  const createdIdSet = new Set(createdList.map((p) => Number(p.id)));
+  for (const id of createdIdSet) {
+    deletedSet.delete(id);
+  }
+
+  // 1. Process custom created products (applying any stored updates)
+  const processedCreated = createdList.map((p) => {
+    const update = updatedMap[p.id] || updatedMap[Number(p.id)];
+    return update ? { ...p, ...update } : p;
+  });
+
+  // 2. Process raw products from server API:
+  // Exclude deleted items and items that are already in processedCreated
+  const processedRaw = (rawList || [])
+    .filter(
+      (p) => !deletedSet.has(Number(p.id)) && !createdIdSet.has(Number(p.id))
+    )
     .map((p) => {
-      const update = updatedMap[p.id];
+      const update = updatedMap[p.id] || updatedMap[Number(p.id)];
       return update ? { ...p, ...update } : p;
     });
 
-  // Prepend newly created products (also checking deleted set)
-  const processedCreated = createdList
-    .filter((p) => !deletedSet.has(Number(p.id)))
-    .map((p) => {
-      const update = updatedMap[p.id];
-      return update ? { ...p, ...update } : p;
-    });
+  // Deduplicate strictly by numeric ID: created items take precedence at top
+  const seenIds = new Set();
+  const merged = [];
 
-  return [...processedCreated, ...processedRaw];
+  for (const item of processedCreated) {
+    const numId = Number(item.id);
+    if (!isNaN(numId) && !seenIds.has(numId)) {
+      seenIds.add(numId);
+      merged.push(item);
+    }
+  }
+
+  for (const item of processedRaw) {
+    const numId = Number(item.id);
+    if (!isNaN(numId) && !seenIds.has(numId)) {
+      seenIds.add(numId);
+      merged.push(item);
+    }
+  }
+
+  return merged;
 }
 
 // Action types
@@ -95,29 +129,55 @@ function productReducer(state, action) {
     case ACTIONS.SET_ERROR:
       return { ...state, loading: false, error: action.payload };
 
-    case ACTIONS.INITIALIZE_CATALOG:
+    case ACTIONS.INITIALIZE_CATALOG: {
+      const seen = new Set();
+      const unique = [];
+      for (const item of (action.payload || [])) {
+        const id = Number(item.id);
+        if (!seen.has(id)) {
+          seen.add(id);
+          unique.push(item);
+        }
+      }
       return {
         ...state,
         loading: false,
         error: null,
-        products: action.payload,
-        allProducts: action.payload,
+        products: unique,
+        allProducts: unique,
       };
+    }
 
-    case ACTIONS.SET_FILTERED_PRODUCTS:
+    case ACTIONS.SET_FILTERED_PRODUCTS: {
+      const seen = new Set();
+      const unique = [];
+      for (const item of (action.payload || [])) {
+        const id = Number(item.id);
+        if (!seen.has(id)) {
+          seen.add(id);
+          unique.push(item);
+        }
+      }
       return {
         ...state,
         loading: false,
         error: null,
-        products: action.payload,
+        products: unique,
       };
+    }
 
     case ACTIONS.ADD_PRODUCT: {
       const newProduct = action.payload;
+      const cleanProducts = state.products.filter(
+        (p) => Number(p.id) !== Number(newProduct.id)
+      );
+      const cleanAll = state.allProducts.filter(
+        (p) => Number(p.id) !== Number(newProduct.id)
+      );
       return {
         ...state,
-        products: [newProduct, ...state.products],
-        allProducts: [newProduct, ...state.allProducts],
+        products: [newProduct, ...cleanProducts],
+        allProducts: [newProduct, ...cleanAll],
       };
     }
 
@@ -168,11 +228,18 @@ export function ProductProvider({ children }) {
       const merged = applyMutations(data.products || [], mutations);
       dispatch({ type: ACTIONS.INITIALIZE_CATALOG, payload: merged });
     } catch (err) {
-      dispatch({
-        type: ACTIONS.SET_ERROR,
-        payload: err.message || 'Failed to load products',
-      });
-      toast.error('Failed to load products');
+      // Fallback: load catalog from stored mutations if server temporarily unreachable
+      const mutations = getStoredMutations();
+      const merged = applyMutations([], mutations);
+      if (merged.length > 0) {
+        dispatch({ type: ACTIONS.INITIALIZE_CATALOG, payload: merged });
+      } else {
+        dispatch({
+          type: ACTIONS.SET_ERROR,
+          payload: err.message || 'Failed to load products',
+        });
+      }
+      toast.error('Failed to load products from server');
     }
   }, []);
 
@@ -268,26 +335,38 @@ export function ProductProvider({ children }) {
           newProduct = await productApi.add(productData);
         } catch {
           // Fallback if API is offline
-          const maxId = state.allProducts.reduce(
-            (max, p) => (typeof p.id === 'number' && p.id > max ? p.id : max),
-            200
-          );
+          const mutations = getStoredMutations();
+          const allKnownIds = [
+            ...state.allProducts.map((p) => Number(p.id) || 0),
+            ...(mutations.created || []).map((p) => Number(p.id) || 0),
+          ];
+          const maxId = Math.max(200, ...allKnownIds);
           newProduct = { ...productData, id: maxId + 1 };
         }
 
         if (!newProduct || !newProduct.id) {
-          const maxId = state.allProducts.reduce(
-            (max, p) => (typeof p.id === 'number' && p.id > max ? p.id : max),
-            200
-          );
+          const mutations = getStoredMutations();
+          const allKnownIds = [
+            ...state.allProducts.map((p) => Number(p.id) || 0),
+            ...(mutations.created || []).map((p) => Number(p.id) || 0),
+          ];
+          const maxId = Math.max(200, ...allKnownIds);
           newProduct = { ...productData, id: maxId + 1 };
         }
 
         // Store mutation in localStorage
         const mutations = getStoredMutations();
+        const numId = Number(newProduct.id);
+
+        // Ensure this new ID is cleared from deleted list in case it was previously deleted
+        mutations.deleted = (mutations.deleted || []).filter(
+          (d) => Number(d) !== numId
+        );
+
+        // Prepend new product to created list
         mutations.created = [
           newProduct,
-          ...mutations.created.filter((p) => p.id !== newProduct.id),
+          ...(mutations.created || []).filter((p) => Number(p.id) !== numId),
         ];
         saveStoredMutations(mutations);
 
@@ -313,11 +392,17 @@ export function ProductProvider({ children }) {
         updated = { id, ...productData };
       }
 
-      const mergedProduct = { id, ...(updated || productData) };
+      const numId = Number(id);
+      const mergedProduct = { id: numId || id, ...(updated || productData) };
 
       // Store mutation in localStorage
       const mutations = getStoredMutations();
       mutations.updated[id] = mergedProduct;
+      mutations.updated[numId] = mergedProduct;
+      // Also update within created list if it is a custom created product
+      mutations.created = (mutations.created || []).map((p) =>
+        Number(p.id) === numId ? { ...p, ...mergedProduct } : p
+      );
       saveStoredMutations(mutations);
 
       dispatch({
@@ -348,13 +433,14 @@ export function ProductProvider({ children }) {
       if (!mutations.deleted.some((d) => Number(d) === numId)) {
         mutations.deleted.push(numId);
       }
-      mutations.created = mutations.created.filter(
+      mutations.created = (mutations.created || []).filter(
         (p) => Number(p.id) !== numId
       );
       delete mutations.updated[id];
+      delete mutations.updated[numId];
       saveStoredMutations(mutations);
 
-      dispatch({ type: ACTIONS.DELETE_PRODUCT, payload: id });
+      dispatch({ type: ACTIONS.DELETE_PRODUCT, payload: numId });
       toast.success('Product deleted', { id: toastId });
       return true;
     } catch (err) {

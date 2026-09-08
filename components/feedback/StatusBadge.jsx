@@ -1,3 +1,5 @@
+'use client';
+
 export default function StatusBadge({ stock }) {
   const qty = Number(stock) || 0;
 

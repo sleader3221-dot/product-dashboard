@@ -7,6 +7,7 @@ const INITIAL_FORM = {
   title: '',
   category: '',
   price: '',
+  costPrice: '',
   stock: '',
   thumbnail: '',
 };
@@ -24,6 +25,7 @@ export default function ProductForm({ product, categories, onSubmit, onCancel })
         title: product.title || '',
         category: product.category || '',
         price: product.price ?? '',
+        costPrice: product.costPrice ?? '',
         stock: product.stock ?? '',
         thumbnail: product.thumbnail || '',
       });
@@ -47,13 +49,17 @@ export default function ProductForm({ product, categories, onSubmit, onCancel })
     }
 
     setSubmitting(true);
-    const success = await onSubmit({
+    const payload = {
       title: form.title.trim(),
       category: form.category.trim(),
       price: Number(Number(form.price).toFixed(2)),
       stock: Math.floor(Number(form.stock)),
       thumbnail: form.thumbnail.trim(),
-    });
+    };
+    if (form.costPrice !== '' && !isNaN(Number(form.costPrice))) {
+      payload.costPrice = Number(Number(form.costPrice).toFixed(2));
+    }
+    const success = await onSubmit(payload);
     setSubmitting(false);
 
     if (success) {
@@ -66,6 +72,19 @@ export default function ProductForm({ product, categories, onSubmit, onCancel })
     `w-full px-3 py-2 border rounded-lg text-sm outline-none transition-colors focus:ring-2 focus:ring-blue-500 ${
       errors[field] ? 'border-red-400 bg-red-50' : 'border-gray-300'
     }`;
+
+  // Live calculation of Retail Margin & Profit
+  const numPrice = Number(form.price);
+  const numCost = form.costPrice !== '' ? Number(form.costPrice) : null;
+  const hasValidMargin =
+    !isNaN(numPrice) &&
+    numPrice > 0 &&
+    numCost !== null &&
+    !isNaN(numCost) &&
+    numCost >= 0;
+
+  const profit = hasValidMargin ? numPrice - numCost : 0;
+  const marginPct = hasValidMargin ? (profit / numPrice) * 100 : 0;
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
@@ -112,10 +131,10 @@ export default function ProductForm({ product, categories, onSubmit, onCancel })
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Price ($) <span className="text-red-500">*</span>
+            Store Price ($) <span className="text-red-500">*</span>
           </label>
           <input
             type="number"
@@ -129,6 +148,24 @@ export default function ProductForm({ product, categories, onSubmit, onCancel })
           />
           {errors.price && (
             <p className="text-red-500 text-xs mt-1">{errors.price}</p>
+          )}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Cost Price ($)
+          </label>
+          <input
+            type="number"
+            name="costPrice"
+            value={form.costPrice}
+            onChange={handleChange}
+            placeholder="0.00"
+            min="0"
+            step="0.01"
+            className={inputClass('costPrice')}
+          />
+          {errors.costPrice && (
+            <p className="text-red-500 text-xs mt-1">{errors.costPrice}</p>
           )}
         </div>
         <div>
@@ -150,6 +187,27 @@ export default function ProductForm({ product, categories, onSubmit, onCancel })
           )}
         </div>
       </div>
+
+      {/* Live Retail Margin & Profit Calculator Display */}
+      {hasValidMargin && (
+        <div
+          className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-semibold animate-in fade-in duration-200 ${
+            profit >= 0
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              : 'bg-rose-50 text-rose-800 border-rose-200'
+          }`}
+        >
+          <span>
+            {profit >= 0 ? 'Estimated Profit:' : 'Loss:'}{' '}
+            <span className="font-bold">
+              {profit >= 0 ? `+$${profit.toFixed(2)}` : `-$${Math.abs(profit).toFixed(2)}`}
+            </span>
+          </span>
+          <span className="bg-white/80 px-2 py-0.5 rounded border border-inherit">
+            Margin: {marginPct.toFixed(1)}%
+          </span>
+        </div>
+      )}
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">

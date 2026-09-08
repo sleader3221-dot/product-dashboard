@@ -59,6 +59,16 @@ export function validateProductForm(data) {
     }
   }
 
+  // 6. Cost Price: Optional, but if provided must be a valid non-negative number
+  if (data?.costPrice !== undefined && data?.costPrice !== null && data?.costPrice !== '') {
+    const numCost = Number(data.costPrice);
+    if (isNaN(numCost)) {
+      errors.costPrice = 'Cost price must be a valid number';
+    } else if (numCost < 0) {
+      errors.costPrice = 'Cost price cannot be negative';
+    }
+  }
+
   return {
     isValid: Object.keys(errors).length === 0,
     errors,
