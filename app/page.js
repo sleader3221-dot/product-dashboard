@@ -404,21 +404,15 @@ export default function Dashboard() {
     }
   }, [filteredProducts, sortBy]);
 
-  // Total pages calculation and boundary auto-clamping
+  // Total pages calculation. The active page is clamped while rendering instead
+  // of inside an effect, so shrinking the result set never triggers a second
+  // render pass just to correct the page number.
   const totalPages = Math.ceil(sortedProducts.length / pageSize) || 1;
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
 
   // 3. Client-Side Pagination Slicing
-  const paginatedProducts = useMemo(() => {
-    const safePage = Math.min(Math.max(1, currentPage), totalPages);
-    const startIndex = (safePage - 1) * pageSize;
-    return sortedProducts.slice(startIndex, startIndex + pageSize);
-  }, [sortedProducts, currentPage, totalPages, pageSize]);
+  const startIndex = (safePage - 1) * pageSize;
+  const paginatedProducts = sortedProducts.slice(startIndex, startIndex + pageSize);
 
   // Check if all items on current page are selected
   const allOnPageSelected =
@@ -589,7 +583,7 @@ export default function Dashboard() {
 
             {/* Client-Side Pagination Controls */}
             <Pagination
-              currentPage={currentPage}
+              currentPage={safePage}
               totalItems={sortedProducts.length}
               pageSize={pageSize}
               onPageChange={handlePageChange}
@@ -630,6 +624,7 @@ export default function Dashboard() {
 
       {/* Product Details / Quick View Modal */}
       <ProductDetailsModal
+        key={quickViewProduct ? quickViewProduct.id : 'no-product'}
         product={quickViewProduct}
         isOpen={Boolean(quickViewProduct)}
         onClose={() => setQuickViewProduct(null)}

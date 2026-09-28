@@ -1,0 +1,60 @@
+name: Security audit
+
+on:
+  schedule:
+    # Mondays 06:00 UTC: catch advisories published against already-merged code
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - package.json
+      - package-lock.json
+      - .github/workflows/security-audit.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Fail on high or critical issues in production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Write full audit report (informational)
+        continue-on-error: true
+        run: npm audit --json > audit-report.json
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: audit-report
+          path: audit-report.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Append audit summary
+        if: always()
+        run: |
+          {
+            echo "### Dependency audit"
+            echo ""
+            echo '```text'
+            npm audit --omit=dev 2>&1 | tail -n 25
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,47 @@
+version: 2
+updates:
+  # Runtime and tooling dependencies (package.json / package-lock.json)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '05:00'
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    commit-message:
+      prefix: 'chore(deps)'
+      prefix-development: 'chore(deps-dev)'
+    labels:
+      - dependencies
+    groups:
+      # One PR for the many tiny patch releases instead of a dozen.
+      production-patch-and-minor:
+        dependency-type: production
+        update-types: [minor, patch]
+      development-patch-and-minor:
+        dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      # Majors must be planned (Next.js/React/Tailwind all have breaking changes)
+      - dependency-name: next
+        update-types: [version-update:semver-major]
+      - dependency-name: react
+        update-types: [version-update:semver-major]
+      - dependency-name: react-dom
+        update-types: [version-update:semver-major]
+
+  # Keep the workflow actions themselves patched (and pinned majors current)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '05:00'
+      timezone: Etc/UTC
+    commit-message:
+      prefix: 'ci(deps)'
+    labels:
+      - dependencies
+      - github-actions

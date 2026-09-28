@@ -23,6 +23,7 @@ export default function ProductModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
       <ProductForm
+        key={product?.id ?? 'new-product'}
         product={product}
         categories={categories}
         onSubmit={onSubmit}

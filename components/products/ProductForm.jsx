@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { validateProductForm } from '@/utils/validation';
 
 const INITIAL_FORM = {
@@ -13,24 +13,24 @@ const INITIAL_FORM = {
 };
 
 export default function ProductForm({ product, categories, onSubmit, onCancel }) {
-  const [form, setForm] = useState(INITIAL_FORM);
+  // Initial state is derived from the product being edited. The dialog is keyed
+  // by product id (see ProductModal), so this initialiser always runs for the
+  // product currently open instead of needing an effect to sync afterwards.
+  const [form, setForm] = useState(() =>
+    product
+      ? {
+          title: product.title || '',
+          category: product.category || '',
+          price: product.price ?? '',
+          costPrice: product.costPrice ?? '',
+          stock: product.stock ?? '',
+          thumbnail: product.thumbnail || '',
+        }
+      : INITIAL_FORM
+  );
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const isEditing = Boolean(product);
-
-  // Pre-populate form when editing
-  useEffect(() => {
-    if (product) {
-      setForm({
-        title: product.title || '',
-        category: product.category || '',
-        price: product.price ?? '',
-        costPrice: product.costPrice ?? '',
-        stock: product.stock ?? '',
-        thumbnail: product.thumbnail || '',
-      });
-    }
-  }, [product]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

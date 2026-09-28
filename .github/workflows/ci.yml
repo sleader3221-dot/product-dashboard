@@ -1,0 +1,200 @@
+name: CI
+
+# Runs on every branch push, every pull request, and on merge-queue entries so
+# the same checks gate direct pushes, PR merges and queue merges.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  merge_group:
+  workflow_dispatch:
+
+# Least privilege by default; individual jobs widen this only if they must.
+permissions:
+  contents: read
+
+# A newer push/PR update makes the previous run obsolete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run ESLint
+        run: npm run lint
+
+  workflow-lint:
+    name: Lint workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # actionlint validates workflow syntax, expressions, action inputs and the
+      # embedded shell scripts, so a typo in .github/workflows fails fast here.
+      - name: Run actionlint
+        run: docker run --rm -v "$PWD:/repo" --workdir /repo rhysd/actionlint:1.7.12
+
+  unit-tests:
+    name: Unit tests (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['22.x', '24.x']
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run unit tests with coverage
+        if: matrix.node-version == '22.x'
+        run: npm run test:coverage
+
+      - name: Run unit tests
+        if: matrix.node-version != '22.x'
+        run: npm run test:unit
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build for production
+        run: npm run build
+
+      # The compiled output is reused by the smoke-test job, so the app that
+      # gets tested is exactly the artifact this job produced.
+      - name: Upload the production build
+        uses: actions/upload-artifact@v6
+        with:
+          name: next-build
+          path: .next
+          retention-days: 7
+          if-no-files-found: error
+          # `.next` is a hidden directory: without this the artifact is empty
+          include-hidden-files: true
+
+  smoke-tests:
+    name: API smoke tests
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Download the production build
+        uses: actions/download-artifact@v6
+        with:
+          name: next-build
+
+      # Boots `next start` on TEST_PORT and exercises the real HTTP endpoints.
+      - name: Run API smoke tests
+        run: npm run test:api
+        env:
+          TEST_PORT: '3100'
+
+  security-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Audit production dependencies (fails on high or critical)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Write full audit report (informational)
+        if: always()
+        continue-on-error: true
+        run: npm audit --json > npm-audit-report.json
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: npm-audit-report
+          path: npm-audit-report.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # Single aggregate status check: point branch protection at "CI success"
+  # instead of wiring up every individual job.
+  ci-success:
+    name: CI success
+    if: ${{ always() }}
+    needs: [lint, workflow-lint, unit-tests, build, smoke-tests, security-audit]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail when a required job did not succeed
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
+        run: |
+          echo "At least one required job did not succeed:"
+          echo '${{ toJSON(needs) }}'
+          exit 1
+
+      - name: Report success
+        run: echo "Lint, unit tests, build, smoke tests and the dependency audit all passed."

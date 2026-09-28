@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Star, Package, Pencil, Trash2, RotateCcw, Truck, Tag, Copy, Check, MessageCircle } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import StatusBadge from '@/components/feedback/StatusBadge';
@@ -26,13 +26,9 @@ export default function ProductDetailsModal({
   const [imgError, setImgError] = useState(false);
   const [copiedSku, setCopiedSku] = useState(false);
 
-  // Reset active image index whenever the product changes
-  useEffect(() => {
-    setActiveImageIndex(0);
-    setImgError(false);
-    setCopiedSku(false);
-  }, [product]);
-
+  // Gallery, image-error and clipboard state are intentionally initialised per
+  // product: the dashboard keys this component by product id so React mounts a
+  // fresh instance for every product that is quick-viewed.
   if (!product) return null;
 
   // Gather available images with fallback to thumbnail

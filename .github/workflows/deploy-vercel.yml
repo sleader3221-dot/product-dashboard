@@ -1,0 +1,149 @@
+name: Deploy to Vercel
+
+# Deliberately opt-in: the deploy steps only run when the Vercel secrets exist,
+# and pull requests from forks can never reach this job.
+on:
+  # Production deploys happen after CI succeeds on main, never in parallel with it.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Vercel target environment
+        type: choice
+        options: [production, preview]
+        default: production
+      ref:
+        description: Git ref to deploy (branch, tag or commit SHA)
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+# Serialise deployments so two runs can never race for the same alias.
+concurrency:
+  group: vercel-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy (${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Only deploy from a successful push build on main, from a version tag, or
+    # from an explicit manual dispatch. The head-repository check makes sure a
+    # fork that pushes a branch called "main" can never deploy.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref_type == 'tag') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    environment:
+      name: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      # A job-level `if` cannot read secrets, so configuration is inspected here
+      # instead: the workflow stays green in repositories that never set them.
+      - name: Check Vercel configuration
+        id: config
+        run: |
+          if [ -z "${VERCEL_TOKEN}" ] || [ -z "${VERCEL_ORG_ID}" ] || [ -z "${VERCEL_PROJECT_ID}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Vercel deployment skipped::Add VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID as repository secrets to enable deployments. See docs/github-actions.md."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve deployment target
+        id: target
+        if: steps.config.outputs.configured == 'true'
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_TARGET: ${{ inputs.target }}
+          DISPATCH_REF: ${{ inputs.ref }}
+          WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          case "$EVENT_NAME" in
+            workflow_run)
+              echo "ref=${WORKFLOW_RUN_SHA}" >> "$GITHUB_OUTPUT"
+              echo "environment=production" >> "$GITHUB_OUTPUT"
+              echo "vercel_flags=--prod" >> "$GITHUB_OUTPUT"
+              ;;
+            push)
+              # Tag push: deploy the tagged commit to production
+              echo "ref=${GITHUB_REF}" >> "$GITHUB_OUTPUT"
+              echo "environment=production" >> "$GITHUB_OUTPUT"
+              echo "vercel_flags=--prod" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "ref=${DISPATCH_REF:-$GITHUB_REF}" >> "$GITHUB_OUTPUT"
+              echo "environment=${DISPATCH_TARGET:-production}" >> "$GITHUB_OUTPUT"
+              if [ "${DISPATCH_TARGET:-production}" = "production" ]; then
+                echo "vercel_flags=--prod" >> "$GITHUB_OUTPUT"
+              else
+                echo "vercel_flags=" >> "$GITHUB_OUTPUT"
+              fi
+              ;;
+          esac
+
+      - name: Checkout repository
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.target.outputs.ref }}
+
+      - name: Set up Node.js
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install the Vercel CLI
+        if: steps.config.outputs.configured == 'true'
+        run: npm install --global vercel@60
+
+      - name: Pull Vercel environment information
+        if: steps.config.outputs.configured == 'true'
+        run: vercel pull --yes --environment=${{ steps.target.outputs.environment }} --token="$VERCEL_TOKEN"
+
+      - name: Build the project with Vercel
+        if: steps.config.outputs.configured == 'true'
+        run: vercel build ${{ steps.target.outputs.vercel_flags }} --token="$VERCEL_TOKEN"
+
+      - name: Deploy prebuilt artifacts
+        id: deploy
+        if: steps.config.outputs.configured == 'true'
+        run: |
+          url=$(vercel deploy --prebuilt ${{ steps.target.outputs.vercel_flags }} --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Vercel deployment"
+            echo ""
+            echo "- Environment: \`${{ steps.target.outputs.environment }}\`"
+            echo "- Ref: \`${{ steps.target.outputs.ref }}\`"
+            echo "- URL: ${url}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report skipped deployment
+        if: steps.config.outputs.configured != 'true'
+        run: |
+          {
+            echo "### Vercel deployment skipped"
+            echo ""
+            echo "The VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID secrets are not configured."
+            echo "See \`docs/github-actions.md\` for setup instructions."
+          } >> "$GITHUB_STEP_SUMMARY"
