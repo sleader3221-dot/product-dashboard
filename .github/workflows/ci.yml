@@ -140,6 +140,17 @@ jobs:
         uses: actions/download-artifact@v6
         with:
           name: next-build
+          # `upload-artifact` stores the *contents* of `.next`, and Next.js writes
+          # its own `.next/package.json` ({"type":"commonjs"}). Unpacking those
+          # files into the repository root overwrites the project's package.json
+          # and every npm script with it, so restore them into `.next` explicitly.
+          path: .next
+
+      - name: Verify the restored build
+        run: |
+          test -f .next/BUILD_ID || { echo "::error::.next/BUILD_ID is missing - the production build was not restored."; exit 1; }
+          grep -q '"test:api"' package.json || { echo "::error::package.json was overwritten by the build artifact."; exit 1; }
+          echo "Restored .next ($(du -sh .next | cut -f1)) and package.json is intact."
 
       # Boots `next start` on TEST_PORT and exercises the real HTTP endpoints.
       - name: Run API smoke tests

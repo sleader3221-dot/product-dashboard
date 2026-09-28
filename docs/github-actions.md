@@ -66,16 +66,21 @@ Key design points:
 ## 3. Branch protection (recommended setup)
 
 1. Open **Settings → Branches → Add branch ruleset / protection rule** for `main`.
-2. Enable **Require a pull request before merging** (1 approval).
-3. Enable **Require status checks to pass** and select:
+2. Enable **Require status checks to pass** and select:
    - `CI success` (the aggregate gate — required)
    - `Analyze javascript-typescript` (CodeQL)
    - `Review dependency changes` (optional, PRs only)
-4. Enable **Require branches to be up to date before merging**.
-5. Enable **Require approval for first-time contributors** and, if you keep the
-   merge queue, **Require merge queue** (CI already listens to `merge_group`).
+3. Enable **Require branches to be up to date before merging**.
+4. Optional, and only once a second maintainer exists: **Require a pull request
+   before merging** with 1 approval. GitHub never lets you approve your own pull
+   request, so on a single-maintainer repository keep the approval count at `0`
+   (or leave the rule off) — the status checks above still gate every pull
+   request, and direct pushes by the owner keep working.
+5. If you want a fully serialised `main`, add **Require merge queue** as well:
+   CI already listens to `merge_group`.
 
-The same configuration through the CLI:
+The same configuration through the CLI — this is what is configured on this
+repository today (status checks only, so the owner can still push to `main`):
 
 ```bash
 cat > /tmp/protection.json <<'JSON'
@@ -85,13 +90,20 @@ cat > /tmp/protection.json <<'JSON'
     "contexts": ["CI success", "Analyze javascript-typescript"]
   },
   "enforce_admins": false,
-  "required_pull_request_reviews": { "required_approving_review_count": 1 },
+  "required_pull_request_reviews": null,
   "restrictions": null
 }
 JSON
 
 gh api -X PUT repos/OWNER/REPO/branches/main/protection \
   --input /tmp/protection.json
+```
+
+Verify with:
+
+```bash
+gh api repos/OWNER/REPO/branches/main/protection \
+  --jq '.required_status_checks.contexts'
 ```
 
 ---
@@ -269,7 +281,9 @@ commit to production. Both are safe to re-run from the Actions tab
 | `Timed out … waiting for http://127.0.0.1:3100` | Something else uses the port; run with `TEST_PORT=3200` |
 | `npm ci` fails with `EBADENGINE` | Node older than 22 — `nvm use` (see `.nvmrc`) |
 | CodeQL: "CodeQL is already enabled" / conflicting default setup | Disable **default setup** under *Settings → Code security* before using the advanced workflow |
-| Dependency review fails to install | The dependency graph is off — enable it under *Settings → Code security* |
+| Dependency review: "Dependency review is not supported on this repository" | The dependency graph is off. Turn it on with `gh api -X PUT repos/OWNER/REPO/vulnerability-alerts` (or *Settings → Code security → Dependency graph*) and re-run the failed job — the pull request itself is fine |
+| `npm error Missing script: "test:api"` in the smoke-test job | The `.next` artifact was unpacked into the repository root, where Next's own `.next/package.json` (`{"type":"commonjs"}`) overwrote the project's `package.json`. Keep `path: .next` on `download-artifact`; the `Verify the restored build` step fails loudly if this ever regresses |
+| Dependabot's `github_actions` job reports `RuntimeError … No files changed!` | Upstream bug in Dependabot's `GithubActions::FileUpdater`: it resolves an action that already sits on its newest major tag and then has nothing to rewrite. The `npm` ecosystem is unaffected and no repository change fixes it |
 | `compatible lockfile` error in CI | `package-lock.json` out of sync with `package.json` — run `npm install` and commit the lockfile |
 | Vercel build differs from `next build` | `vercel build` uses the project's build settings; keep them in sync under *Project → Settings → Build & Development* |
 

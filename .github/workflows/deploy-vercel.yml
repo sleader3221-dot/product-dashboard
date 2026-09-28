@@ -32,7 +32,10 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy (${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }})
+    # Keep this name static: expressions in `name:` are not expanded when a job is
+    # skipped, which showed up as a literal "Deploy (${{ ... }})" check run. The
+    # target and URL are reported in the job summary and the `environment:` below.
+    name: Deploy to Vercel
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # Only deploy from a successful push build on main, from a version tag, or
