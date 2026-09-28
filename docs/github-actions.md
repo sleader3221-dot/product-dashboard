@@ -178,6 +178,14 @@ deploy twice (once by Vercel, once by Actions). Choose one:
   Saved as `vercel.json`. (Not committed here on purpose — it would change how
   the existing live demo is built.)
 
+**State of this repository (verified 2026-09-28):** the Vercel Git integration
+*is* connected — pull requests get a `Vercel` preview check and pushes to `main`
+deploy production on their own, with no repository secret involved (checked with
+`https://product-dashboard-steel-two.vercel.app/api/products`, which answers with
+the full 194-row catalogue). The `VERCEL_*` secrets are therefore deliberately
+left unset: this workflow reports a *skipped* deployment instead of publishing the
+same commit a second time.
+
 ---
 
 ## 5. Dependabot
@@ -190,7 +198,18 @@ deploy twice (once by Vercel, once by Actions). Choose one:
 - `github-actions`: keeps `actions/checkout`, `actions/setup-node`,
   `actions/upload-artifact`, `github/codeql-action`, … on current majors.
 
+The first `github-actions` update run failed with
+`RuntimeError … No files changed!` inside Dependabot's own
+`GithubActions::FileUpdater`: it resolves an action that already sits on the
+newest major tag and then has nothing to rewrite. That is an upstream Dependabot
+bug, not a problem with this configuration — the two `npm` groups are unaffected
+and opened their pull requests normally.
+
 Every Dependabot PR runs the full CI pipeline, so a green PR is safe to merge.
+If a pipeline fix lands *after* a Dependabot PR was opened, that PR still carries
+the old workflow and stays red, so it cannot pass the required `CI success` check.
+Comment `@dependabot rebase` (or enable Dependabot auto-rebase in the project
+settings) to move it onto the new revision before merging it.
 Note that workflows triggered by Dependabot get a **read-only** `GITHUB_TOKEN`
 unless *Settings → Actions → General → "Send write tokens to workflows from pull
 requests"* is enabled; the dependency-review job's PR comment is therefore
