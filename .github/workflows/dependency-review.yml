@@ -17,7 +17,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Requires the dependency graph (enabled by default for public repos).
       - name: Review dependency changes

@@ -22,7 +22,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # Full history so generated release notes can diff against the last tag
           fetch-depth: 0
