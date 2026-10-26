@@ -137,7 +137,7 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Download the production build
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: next-build
           # `upload-artifact` stores the *contents* of `.next`, and Next.js writes
