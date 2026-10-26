@@ -109,7 +109,7 @@ jobs:
       # The compiled output is reused by the smoke-test job, so the app that
       # gets tested is exactly the artifact this job produced.
       - name: Upload the production build
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: next-build
           path: .next
@@ -185,7 +185,7 @@ jobs:
 
       - name: Upload audit report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: npm-audit-report
           path: npm-audit-report.json
