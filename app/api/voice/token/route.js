@@ -56,13 +56,13 @@ export async function POST(request) {
     const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 8000 } });
     const expireTime = new Date(Date.now() + 30 * 60 * 1000).toISOString();
     const newSessionExpireTime = new Date(Date.now() + 60 * 1000).toISOString();
+    // Keep lockAdditionalFields unset; [] makes this SDK version emit an invalid field mask.
     const token = await ai.authTokens.create({
       config: {
         uses: 1,
         expireTime,
         newSessionExpireTime,
         liveConnectConstraints: { model, config },
-        lockAdditionalFields: [],
         httpOptions: { apiVersion: 'v1alpha' },
       },
     });
