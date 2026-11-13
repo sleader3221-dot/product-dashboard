@@ -27,6 +27,15 @@ A fully responsive product management dashboard built with **Next.js 16** and **
 
 ---
 
+## Voice assistant (Vaani)
+
+Tap the blue mic (or press **Alt+V**) to manage inventory by voice or typing in
+Hindi, Kannada, English or any mix. It runs on Gemini Live with a free API key
+(`GEMINI_API_KEY`), and falls back to offline browser speech without one.
+Setup, architecture and safety rules: **[docs/voice-agent.md](docs/voice-agent.md)**.
+
+---
+
 ## Getting Started
 
 **Prerequisites:** Node.js 22+ (see `.nvmrc`)

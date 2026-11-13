@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import store from '@/lib/store';
+import { ProductCreate, validationError } from '@/lib/productSchema';
 
 const BASE_URL = 'https://dummyjson.com';
 
@@ -24,9 +25,13 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
+    const parsed = ProductCreate.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(validationError(parsed), { status: 400 });
+    }
 
     // Add to singleton server store immediately
-    const newProduct = store.add(body);
+    const newProduct = store.add(parsed.data);
 
     // Call upstream DummyJSON in background
     fetch(`${BASE_URL}/products/add`, {

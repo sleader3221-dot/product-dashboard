@@ -22,7 +22,8 @@ import ErrorState from '@/components/ui/ErrorState';
 import EmptyState from '@/components/ui/EmptyState';
 import BulkActionBar from '@/components/ui/BulkActionBar';
 import NetworkBanner from '@/components/ui/NetworkBanner';
-import { LayoutGrid, List } from 'lucide-react';
+import VoiceAgent from '@/components/voice/VoiceAgent';
+import { LayoutGrid, List, Mic, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function Dashboard() {
@@ -63,6 +64,12 @@ export default function Dashboard() {
   const [deletingProduct, setDeletingProduct] = useState(null);
   const [quickViewProduct, setQuickViewProduct] = useState(null);
 
+  // Voice agent: products it is talking about, and cards it just changed.
+  const [voiceFilter, setVoiceFilter] = useState(null); // { ids: number[], label }
+  const [highlightIds, setHighlightIds] = useState(() => new Set());
+  const highlightTimer = useRef(null);
+  const voiceUiRef = useRef(null);
+
   const debouncedSearch = useDebounce(searchInput, 300);
   const isInitialMount = useRef(true);
 
@@ -91,6 +98,7 @@ export default function Dashboard() {
 
   // Search input typing handler: resets pagination to 1 and clears selection
   const handleSearchChange = (e) => {
+    setVoiceFilter(null);
     const val = e.target.value;
     setSearchInput(val);
     setCurrentPage(1);
@@ -114,6 +122,7 @@ export default function Dashboard() {
 
   // Category change handler: resets pagination to 1 and clears selection
   const handleCategoryChange = (category) => {
+    setVoiceFilter(null);
     setActiveCategory(category);
     setSearchInput('');
     setCurrentPage(1);
@@ -138,6 +147,7 @@ export default function Dashboard() {
   // - Clicking 'Out of Stock': resets activeCategory to 'all' and shows celebratory in-stock state
   // - Clicking any card ALWAYS resets currentPage to 1
   const handleSelectKpiFilter = (filterKey) => {
+    setVoiceFilter(null);
     setCurrentPage(1);
     setSelectedIds(new Set());
 
@@ -208,6 +218,7 @@ export default function Dashboard() {
 
   // Global reset for all filters
   const handleResetAllFilters = () => {
+    setVoiceFilter(null);
     setSearchInput('');
     setActiveCategory('all');
     setKpiFilter('all');
@@ -353,6 +364,14 @@ export default function Dashboard() {
   const filteredProducts = useMemo(() => {
     let list = baseCatalog;
 
+    // Voice results replace the other filters while active.
+    if (voiceFilter) {
+      const order = new Map(voiceFilter.ids.map((id, i) => [Number(id), i]));
+      return list
+        .filter((p) => order.has(Number(p.id)))
+        .sort((a, b) => order.get(Number(a.id)) - order.get(Number(b.id)));
+    }
+
     // A. Filter by Search Query
     if (searchInput && searchInput.trim()) {
       const q = searchInput.trim().toLowerCase();
@@ -383,7 +402,7 @@ export default function Dashboard() {
     }
 
     return list;
-  }, [baseCatalog, searchInput, activeCategory, kpiFilter]);
+  }, [baseCatalog, searchInput, activeCategory, kpiFilter, voiceFilter]);
 
   // 2. Operational Sorting
   const sortedProducts = useMemo(() => {
@@ -418,6 +437,59 @@ export default function Dashboard() {
   const allOnPageSelected =
     paginatedProducts.length > 0 &&
     paginatedProducts.every((p) => selectedIds.has(p.id));
+
+  // Control surface for the voice agent. Rebuilt every render so it always
+  // sees current state; the agent reads it through a ref at call time.
+  useEffect(() => {
+    voiceUiRef.current = {
+      showIds: (ids, label) => {
+        setVoiceFilter({ ids: ids.map(Number), label: label || 'voice results' });
+        setSearchInput('');
+        setCurrentPage(1);
+        setSelectedIds(new Set());
+      },
+      setStockFilter: (key) => {
+        setVoiceFilter(null);
+        setSearchInput('');
+        setActiveCategory('all');
+        setKpiFilter(key);
+        setCurrentPage(1);
+      },
+      setCategory: (slug) => {
+        setVoiceFilter(null);
+        handleCategoryChange(slug);
+      },
+      setSort: (value) => setSortBy(value),
+      setView: (value) => setViewMode(value),
+      goToPage: (n) => handlePageChange(n),
+      clearFilters: () => {
+        setVoiceFilter(null);
+        handleResetAllFilters();
+      },
+      openProduct: (product, mode) => (mode === 'edit' ? setEditingProduct(product) : setQuickViewProduct(product)),
+      highlight: (ids) => {
+        setHighlightIds(new Set(ids.map(Number)));
+        clearTimeout(highlightTimer.current);
+        highlightTimer.current = setTimeout(() => setHighlightIds(new Set()), 4000);
+      },
+      getScreenState: () => ({
+        search: searchInput || null,
+        category: activeCategory,
+        stock_filter: kpiFilter,
+        voice_results: voiceFilter ? { label: voiceFilter.label, count: voiceFilter.ids.length } : null,
+        sort: sortBy,
+        view: viewMode,
+        page: safePage,
+        total_pages: totalPages,
+        products_listed: sortedProducts.length,
+        visible_on_this_page: paginatedProducts.map((p) => ({ id: Number(p.id), title: p.title, stock: Number(p.stock) || 0 })),
+        selected_ids: Array.from(selectedIds),
+        open_dialog: editingProduct ? 'edit' : quickViewProduct ? 'quick_view' : isAddModalOpen ? 'add' : deletingProduct ? 'delete' : null,
+      }),
+    };
+  });
+
+  useEffect(() => () => clearTimeout(highlightTimer.current), []);
 
   return (
     <div className="min-h-screen bg-gray-50/70">
@@ -460,6 +532,23 @@ export default function Dashboard() {
           onClearKpiFilter={handleClearKpiFilter}
           onResetAll={handleResetAllFilters}
         />
+
+        {voiceFilter && (
+          <div className="mb-4 flex items-center gap-2 text-sm">
+            <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200">
+              <Mic className="h-3.5 w-3.5" aria-hidden="true" />
+              Voice: {voiceFilter.label} ({voiceFilter.ids.length})
+              <button
+                type="button"
+                onClick={() => setVoiceFilter(null)}
+                className="p-0.5 rounded-full hover:bg-blue-100"
+                aria-label="Clear voice results"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </span>
+          </div>
+        )}
 
         {/* Toolbar: Result Count, [📄 Export PDF], View Toggle, and Sort Dropdown */}
         {!loading && !error && (
@@ -562,6 +651,7 @@ export default function Dashboard() {
             {viewMode === 'grid' ? (
               <ProductGrid
                 products={paginatedProducts}
+                highlightIds={highlightIds}
                 onEdit={setEditingProduct}
                 onDelete={setDeletingProduct}
                 onQuickView={setQuickViewProduct}
@@ -571,6 +661,7 @@ export default function Dashboard() {
             ) : (
               <ProductTable
                 products={paginatedProducts}
+                highlightIds={highlightIds}
                 onEdit={setEditingProduct}
                 onDelete={setDeletingProduct}
                 onQuickView={setQuickViewProduct}
@@ -638,6 +729,8 @@ export default function Dashboard() {
           setDeletingProduct(prod);
         }}
       />
+
+      <VoiceAgent uiRef={voiceUiRef} categories={categories} raised={selectedIds.size > 0} />
 
       {/* Floating Batch Action Bar */}
       <BulkActionBar

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import store from '@/lib/store';
+import { ProductUpdate, validationError } from '@/lib/productSchema';
 
 const BASE_URL = 'https://dummyjson.com';
 
@@ -9,9 +10,13 @@ export async function PUT(request, context) {
 
   try {
     const body = await request.json();
+    const parsed = ProductUpdate.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(validationError(parsed), { status: 400 });
+    }
 
     // Update in shared server store immediately
-    const updatedProduct = store.update(id, body);
+    const updatedProduct = store.update(id, parsed.data);
 
     // Call upstream DummyJSON in background if valid server product
     const numericId = Number(id);

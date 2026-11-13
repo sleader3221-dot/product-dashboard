@@ -19,6 +19,7 @@ export default function ProductCard({
   onDelete,
   onQuickView,
   isSelected = false,
+  isHighlighted = false,
   onToggleSelect,
 }) {
   const [imgError, setImgError] = useState(false);
@@ -39,7 +40,11 @@ export default function ProductCard({
   return (
     <div
       className={`group bg-white rounded-xl border shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col hover:-translate-y-0.5 ${
-        isSelected ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-gray-200'
+        isSelected
+          ? 'border-blue-500 ring-2 ring-blue-500/50'
+          : isHighlighted
+            ? 'border-amber-400 ring-4 ring-amber-300/60'
+            : 'border-gray-200'
       }`}
     >
       {/* Clickable Image Container for Quick View */}

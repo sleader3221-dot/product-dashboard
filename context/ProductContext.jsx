@@ -6,6 +6,10 @@ import toast from 'react-hot-toast';
 
 const STORAGE_KEY = 'dukaanse_store_mutations_v1';
 
+// Toasts that can be muted for bulk voice actions (the voice panel reports those).
+const NO_TOAST = { loading: () => undefined, success: () => undefined, error: () => undefined };
+const notifier = (silent) => (silent ? NO_TOAST : toast);
+
 /**
  * Helper to retrieve persisted mutations from localStorage.
  * Ensures created, edited, and deleted products survive page refreshes and serverless resets.
@@ -327,7 +331,8 @@ export function ProductProvider({ children }) {
 
   // Add Product with optimistic UI update and mutation persistence
   const addProduct = useCallback(
-    async (productData) => {
+    async (productData, { silent = false } = {}) => {
+      const toast = notifier(silent);
       const toastId = toast.loading('Adding product...');
       try {
         let newProduct;
@@ -341,7 +346,9 @@ export function ProductProvider({ children }) {
             ...(mutations.created || []).map((p) => Number(p.id) || 0),
           ];
           const maxId = Math.max(200, ...allKnownIds);
-          newProduct = { ...productData, id: maxId + 1 };
+          const wanted = Number(productData.restoreId);
+          const restoreFree = Number.isInteger(wanted) && wanted > 0 && !allKnownIds.includes(wanted);
+          newProduct = { ...productData, id: restoreFree ? wanted : maxId + 1 };
         }
 
         if (!newProduct || !newProduct.id) {
@@ -351,7 +358,15 @@ export function ProductProvider({ children }) {
             ...(mutations.created || []).map((p) => Number(p.id) || 0),
           ];
           const maxId = Math.max(200, ...allKnownIds);
-          newProduct = { ...productData, id: maxId + 1 };
+          const wanted = Number(productData.restoreId);
+          const restoreFree = Number.isInteger(wanted) && wanted > 0 && !allKnownIds.includes(wanted);
+          newProduct = { ...productData, id: restoreFree ? wanted : maxId + 1 };
+        }
+
+        // The restore hint is request-only; never persist it on the product.
+        if (newProduct && 'restoreId' in newProduct) {
+          const { restoreId: _restoreId, ...clean } = newProduct;
+          newProduct = clean;
         }
 
         // Store mutation in localStorage
@@ -372,7 +387,7 @@ export function ProductProvider({ children }) {
 
         dispatch({ type: ACTIONS.ADD_PRODUCT, payload: newProduct });
         toast.success('Product added successfully!', { id: toastId });
-        return true;
+        return newProduct;
       } catch (err) {
         toast.error('Failed to add product', { id: toastId });
         return false;
@@ -382,7 +397,8 @@ export function ProductProvider({ children }) {
   );
 
   // Update Product with optimistic UI update and mutation persistence
-  const updateProduct = useCallback(async (id, productData) => {
+  const updateProduct = useCallback(async (id, productData, { silent = false } = {}) => {
+    const toast = notifier(silent);
     const toastId = toast.loading('Updating product...');
     try {
       let updated;
@@ -418,7 +434,8 @@ export function ProductProvider({ children }) {
   }, []);
 
   // Delete Product with optimistic UI update and mutation persistence
-  const deleteProduct = useCallback(async (id) => {
+  const deleteProduct = useCallback(async (id, { silent = false } = {}) => {
+    const toast = notifier(silent);
     const toastId = toast.loading('Deleting product...');
     try {
       try {
@@ -449,6 +466,16 @@ export function ProductProvider({ children }) {
     }
   }, []);
 
+  // Restore a deleted product (voice undo). Keeps the original id when the
+  // server still has it free, and falls back to a new id otherwise.
+  const restoreProduct = useCallback(
+    async (product) => {
+      const { id, ...rest } = product;
+      return addProduct({ ...rest, restoreId: Number(id) }, { silent: true });
+    },
+    [addProduct]
+  );
+
   return (
     <ProductContext.Provider
       value={{
@@ -459,6 +486,7 @@ export function ProductProvider({ children }) {
         addProduct,
         updateProduct,
         deleteProduct,
+        restoreProduct,
         setSearch: (q) => dispatch({ type: ACTIONS.SET_SEARCH, payload: q }),
         setCategory: (c) =>
           dispatch({ type: ACTIONS.SET_CATEGORY, payload: c }),

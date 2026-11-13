@@ -8,6 +8,7 @@ export default function ProductGrid({
   onDelete,
   onQuickView,
   selectedIds = new Set(),
+  highlightIds = new Set(),
   onToggleSelect,
 }) {
   return (
@@ -17,6 +18,7 @@ export default function ProductGrid({
           key={`prod-${product.id ?? idx}`}
           product={product}
           isSelected={selectedIds.has(product.id)}
+          isHighlighted={highlightIds.has(Number(product.id))}
           onToggleSelect={onToggleSelect}
           onEdit={onEdit}
           onDelete={onDelete}

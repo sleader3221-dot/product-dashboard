@@ -61,6 +61,7 @@ export default function ProductTable({
   onDelete,
   onQuickView,
   selectedIds = new Set(),
+  highlightIds = new Set(),
   onToggleSelect,
   onSelectAllOnPage,
   allOnPageSelected = false,
@@ -114,7 +115,7 @@ export default function ProductTable({
               <tr
                 key={`tbl-prod-${product.id ?? idx}`}
                 className={`transition-colors hover:bg-slate-50/80 ${
-                  isSelected ? 'bg-blue-50/50' : ''
+                  isSelected ? 'bg-blue-50/50' : highlightIds.has(Number(product.id)) ? 'bg-amber-50' : ''
                 }`}
               >
                 {/* Checkbox */}
